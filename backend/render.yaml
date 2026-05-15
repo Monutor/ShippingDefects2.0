@@ -1,6 +1,7 @@
 services:
   - type: web
     name: warehouse-brain-backend
+    rootDir: backend
     env: node
     plan: free
     branch: main
