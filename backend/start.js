@@ -1,5 +1,5 @@
 /**
- * Wrapper: создаёт DATABASE_URL из POSTGRES_* переменных и запускает миграции.
+ * Wrapper: конструирует DATABASE_URL из POSTGRES_* и запускает миграции + сервер.
  * Render не генерирует DATABASE_URL автоматически при fromDatabase.
  */
 
@@ -25,9 +25,11 @@ if (!host || !db || !user || !pass) {
 const DATABASE_URL = `postgresql://${user}:${pass}@${host}:${port}/${db}`;
 console.log('DATABASE_URL constructed, running migrations...');
 
-execSync(`DATABASE_URL="${DATABASE_URL}" npx node-pg-migrate --config .pg-migrate.json -m migrations up`, {
+// Запускаем миграции с DATABASE_URL в env, cwd = backend (где лежит migrations/)
+execSync(`npx node-pg-migrate --database ${db} --hostname ${host} --port ${port} --username ${user} --password ${pass} --migdir migrations up`, {
   stdio: 'inherit',
   cwd: root,
+  env: { ...process.env },
 });
 
 console.log('Migrations completed. Starting server...');
