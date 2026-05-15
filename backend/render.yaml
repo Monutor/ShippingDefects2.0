@@ -6,7 +6,7 @@ services:
     plan: free
     branch: main
     buildCommand: npm install
-    startCommand: npm run db:init && node src/server.js
+    startCommand: npx node-pg-migrate --config .pg-migrate.json -m migrations up && node src/server.js
     envVars:
       - key: NODE_ENV
         value: production
