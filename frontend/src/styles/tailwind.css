@@ -1,0 +1,297 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 
+ * Базовые стили для тёмной темы PWA
+ * Строгий, утилитарный, профессиональный дизайн
+ */
+
+/* Базовый сброс */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  touch-action: manipulation;
+  /* Тёмный фон по умолчанию */
+  background-color: #0f172a; /* slate-900 */
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 
+ * Утилиты для безопасных зон iOS 
+ */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 
+ * Анимации Vue Transition 
+ */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(100%);
+}
+
+/* 
+ * Кастомные утилиты 
+ */
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 
+ * Компоненты Tailwind 
+ */
+@layer components {
+  /* Карточка товара - базовый стиль */
+  .product-card {
+    @apply bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl p-4 
+           transition-all duration-200 hover:border-slate-600;
+  }
+
+  .product-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Карточка действия */
+  .action-card {
+    @apply bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl p-4 
+           transition-all duration-200 cursor-pointer
+           hover:border-primary-500/30 hover:bg-slate-800;
+  }
+
+  .action-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Статусная карточка */
+  .status-card {
+    @apply rounded-2xl p-4 border transition-all duration-200;
+  }
+
+  .status-card-success {
+    @apply bg-emerald-500/10 border-emerald-500/30 text-emerald-400;
+  }
+
+  .status-card-warning {
+    @apply bg-amber-500/10 border-amber-500/30 text-amber-400;
+  }
+
+  .status-card-error {
+    @apply bg-rose-500/10 border-rose-500/30 text-rose-400;
+  }
+
+  /* Поля ввода - крупные с четкими лейблами */
+  .input-field {
+    @apply w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 
+           text-slate-100 placeholder-slate-500
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+           transition-all duration-200;
+  }
+
+  .input-label {
+    @apply block text-sm font-medium text-slate-400 mb-2;
+  }
+
+  /* Кнопки */
+  .btn-primary {
+    @apply bg-primary-600 hover:bg-primary-500 text-white font-semibold 
+           rounded-xl px-6 py-3 transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-slate-900
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-slate-700 hover:bg-slate-600 text-slate-100 font-semibold 
+           rounded-xl px-6 py-3 transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:ring-offset-slate-900
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-success {
+    @apply bg-emerald-600 hover:bg-emerald-500 text-white font-semibold 
+           rounded-xl px-6 py-3 transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-900
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-warning {
+    @apply bg-amber-600 hover:bg-amber-500 text-white font-semibold 
+           rounded-xl px-6 py-3 transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-slate-900
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-danger {
+    @apply bg-rose-600 hover:bg-rose-500 text-white font-semibold 
+           rounded-xl px-6 py-3 transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 focus:ring-offset-slate-900
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Навигация */
+  .nav-bar {
+    @apply bg-slate-800/90 backdrop-blur-lg border-b border-slate-700 sticky top-0 z-40;
+  }
+
+  .tab-bar {
+    @apply bg-slate-800/90 backdrop-blur-lg border-t border-slate-700 fixed bottom-0 left-0 right-0 z-40;
+  }
+
+  /* Таблицы и списки */
+  .data-table {
+    @apply w-full border-collapse;
+  }
+
+  .data-table th {
+    @apply bg-slate-800 text-slate-400 font-medium text-sm text-left px-4 py-3 border-b border-slate-700;
+  }
+
+  .data-table td {
+    @apply px-4 py-3 text-slate-300 border-b border-slate-800;
+  }
+
+  .data-table tr:last-child td {
+    @apply border-b-0;
+  }
+
+  /* Бейджи статусов */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply bg-emerald-500/20 text-emerald-400 border border-emerald-500/30;
+  }
+
+  .badge-warning {
+    @apply bg-amber-500/20 text-amber-400 border border-amber-500/30;
+  }
+
+  .badge-error {
+    @apply bg-rose-500/20 text-rose-400 border border-rose-500/30;
+  }
+
+  .badge-info {
+    @apply bg-primary-500/20 text-primary-400 border border-primary-500/30;
+  }
+
+  /* Модальные окна с эффектом стекла */
+  .modal-glass {
+    @apply bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-3xl shadow-2xl;
+  }
+
+  /* Разделители */
+  .divider {
+    @apply h-px bg-slate-700 my-4;
+  }
+
+  /* Секции */
+  .section-title {
+    @apply text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3;
+  }
+
+  /* Grid для карточек */
+  .cards-grid {
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3;
+  }
+}
+
+/* 
+ * Утилитные классы 
+ */
+@layer utilities {
+  /* Градиентный текст */
+  .text-gradient {
+    @apply bg-clip-text text-transparent;
+  }
+
+  .text-gradient-primary {
+    @apply bg-gradient-to-r from-primary-400 to-primary-600 bg-clip-text text-transparent;
+  }
+
+  .text-gradient-success {
+    @apply bg-gradient-to-r from-emerald-400 to-emerald-600 bg-clip-text text-transparent;
+  }
+
+  .text-gradient-warning {
+    @apply bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent;
+  }
+
+  /* Скрытие скроллбара */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Кастомный скроллбар */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #475569 #1e293b;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: #1e293b;
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+
+  /* Доступность - фокус для клавиатуры */
+  .focus-visible-ring {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900;
+  }
+}

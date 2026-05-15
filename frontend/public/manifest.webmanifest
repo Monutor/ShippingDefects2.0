@@ -1,0 +1,19 @@
+{
+  "name": "Учёт брака на складе",
+  "short_name": "Брак PWA",
+  "description": "Мобильное приложение для учёта бракованной электроники",
+  "theme_color": "#1989fa",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/ShippingDefects/",
+  "start_url": "/ShippingDefects/",
+  "icons": [
+    {
+      "src": "img/scanning-scan-favicon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

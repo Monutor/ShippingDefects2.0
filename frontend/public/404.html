@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Redirecting...</title>
+  <script>
+    // Трюк для GitHub Pages с history mode
+    // Перенаправляем все запросы на index.html для Vue Router
+    var path = window.location.href.replace(window.location.origin, '');
+    var basePath = '/ShippingDefects/'; // TODO: Укажите имя репозитория, например '/warehouse-brain-pwa/'
+    if (basePath && !path.startsWith(basePath)) {
+      path = basePath + path;
+    }
+    window.location.href = basePath + '/?' + (path.length > 0 ? 'redirect=' + encodeURIComponent(path) : '');
+  </script>
+</head>
+<body>
+  <p>Перенаправление...</p>
+</body>
+</html>

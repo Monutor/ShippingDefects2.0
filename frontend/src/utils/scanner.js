@@ -1,0 +1,163 @@
+import { Html5Qrcode } from 'html5-qrcode'
+
+/**
+ * Класс-обёртка для работы со сканером штрихкодов
+ */
+export class BarcodeScanner {
+  constructor() {
+    this.scanner = null
+    this.isScanning = false
+  }
+
+  /**
+   * Инициализация сканера
+   * @param {string} elementId - ID DOM-элемента для рендеринга сканера
+   */
+  init(elementId) {
+    // Очищаем предыдущий сканер если есть
+    if (this.scanner) {
+      this.scanner.clear()
+    }
+    this.scanner = new Html5Qrcode(elementId)
+  }
+
+  /**
+   * Запуск сканирования
+   * @param {Function} onScanSuccess - callback при успешном сканировании
+   * @param {Object} config - конфигурация сканера
+   * @returns {Promise}
+   */
+  async start(onScanSuccess, config = {}) {
+    if (this.isScanning) {
+      throw new Error('Сканирование уже запущено')
+    }
+
+    const defaultConfig = {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1.0,
+      disableFlip: false
+    }
+
+    const mergedConfig = { ...defaultConfig, ...config }
+
+    try {
+      // BUG-232 fix: проверяем инициализацию в начале start()
+      if (!this.scanner) {
+        throw new Error('Сканер не инициализирован — вызовите init() перед start()')
+      }
+
+      // Запускаем сканирование с использованием задней камеры
+      await this.scanner.start(
+        { facingMode: 'environment' },
+        mergedConfig,
+        (decodedText, decodedResult) => {
+          // Останавливаем сканирование после успешного чтения
+          this.stop()
+          onScanSuccess(decodedText, decodedResult)
+        },
+        (errorMessage) => {
+          // Игнорируем ошибки сканирования (это нормально при поиске кода)
+          // console.debug('Scanning:', errorMessage)
+        }
+      )
+      this.isScanning = true
+    } catch (error) {
+      console.error('Ошибка запуска сканера:', error)
+      
+      // Пробуем альтернативный способ - по deviceId
+      if (error.message?.includes('Permission') || error.message?.includes('NotAllowed')) {
+        throw new Error('Нет доступа к камере. Разрешите доступ в настройках браузера.')
+      }
+      if (error.message?.includes('HttpsRequired') || error.message?.includes('SecureContext')) {
+        throw new Error('Требуется HTTPS. Откройте приложение по HTTPS или localhost.')
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Остановка сканирования
+   * @returns {Promise}
+   */
+  async stop() {
+    if (!this.isScanning || !this.scanner) {
+      return
+    }
+
+    try {
+      await this.scanner.stop()
+      this.isScanning = false
+    } catch (error) {
+      console.error('Ошибка остановки сканера:', error)
+      this.isScanning = false
+    }
+  }
+
+  /**
+   * Очистка ресурсов
+   */
+  async cleanup() {
+    if (this.scanner) {
+      try {
+        if (this.isScanning) {
+          await this.scanner.stop()
+        }
+        await this.scanner.clear()
+      } catch (error) {
+        console.error('Ошибка очистки сканера:', error)
+      }
+      this.scanner = null
+      this.isScanning = false
+    }
+  }
+}
+
+/**
+ * Фабричная функция для создания экземпляра сканера
+ * @param {string|Object} options - ID элемента или объект { elementId, onScan, onError }
+ * @returns {BarcodeScanner}
+ */
+export function createScanner(options) {
+  const scanner = new BarcodeScanner()
+  
+  if (typeof options === 'string') {
+    scanner.init(options)
+  } else {
+    scanner.init(options.elementId)
+    if (options.onScan || options.onError) {
+      scanner.start(options.onScan, options.onError)
+    }
+  }
+  
+  return scanner
+}
+
+/**
+ * Проверка поддержки камеры браузером
+ * @returns {Promise<boolean>}
+ */
+export async function checkCameraSupport() {
+  // BUG-233 fix: разрешаем http://192.168.*.* для локальной сети
+  const isLocalNetwork = window.location.hostname.match(/^192\.168\.\d+\.\d+$/)
+  if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && !isLocalNetwork) {
+    console.warn('Камера требует HTTPS или localhost')
+    return false
+  }
+
+  // Проверка наличия getUserMedia
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    console.warn('Браузер не поддерживает доступ к камере')
+    return false
+  }
+
+  // Пробуем получить доступ к камере
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    stream.getTracks().forEach(track => track.stop())
+    return true
+  } catch (error) {
+    console.error('Ошибка проверки камеры:', error)
+    return false
+  }
+}

@@ -1,0 +1,129 @@
+/* 
+ * Кастомные стили поверх Tailwind 
+ * Дополнительные утилиты и переопределения
+ */
+
+/* Утилиты для безопасных зон iOS */
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+button {
+  border: none;
+  background-color: transparent;
+  padding: 0;
+  cursor: pointer;
+  cursor: pointer;
+}
+
+/* Анимации Vue Transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(100%);
+}
+
+/* 
+ * Глобальные стили для приложения 
+ */
+#app {
+  background: linear-gradient(to bottom, #0f172a, #1e293b);
+  min-height: 100vh;
+}
+
+/* Отступ снизу для контента с таббаром */
+#app > *:not(:last-child) {
+  padding-bottom: calc(8rem + env(safe-area-inset-bottom));
+}
+
+/* Скроллбар для Webkit */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e293b;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Базовые стили для Vant Icons (только иконки) */
+.van-icon {
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 
+ * Переопределение стилей Vant для тёмной темы
+ * Важно: эти стили должны быть после всех остальных
+ */
+
+/* Popup, Dialog, Picker - тёмный фон */
+.van-popup,
+.van-dialog,
+.van-picker {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+}
+
+/* Toolbar в picker */
+.van-picker__toolbar {
+  background-color: #0f172a !important;
+  border-bottom-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+/* Колонки picker */
+.van-picker-column {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+}
+
+.van-picker-column__item {
+  color: #f1f5f9 !important;
+}
+
+.van-picker-column__item--selected {
+  color: #60a5fa !important;
+}
+
+/* Кнопки в toolbar */
+.van-picker__cancel,
+.van-picker__confirm {
+  color: #94a3b8 !important;
+}
+
+.van-picker__confirm {
+  color: #60a5fa !important;
+}
+
+/* Overlay */
+.van-overlay {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
