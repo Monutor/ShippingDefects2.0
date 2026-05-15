@@ -1,12 +1,15 @@
-#!/usr/bin/env node
 /**
  * Wrapper: создаёт DATABASE_URL из POSTGRES_* переменных и запускает миграции.
  * Render не генерирует DATABASE_URL автоматически при fromDatabase.
  */
 
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const root = join(__dirname, '..');
 
 const host = process.env.POSTGRES_HOST;
 const port = process.env.POSTGRES_PORT || '5432';
@@ -22,16 +25,10 @@ if (!host || !db || !user || !pass) {
 const DATABASE_URL = `postgresql://${user}:${pass}@${host}:${port}/${db}`;
 console.log('DATABASE_URL constructed, running migrations...');
 
-// Run migrations
 execSync(`DATABASE_URL="${DATABASE_URL}" npx node-pg-migrate --config .pg-migrate.json -m migrations up`, {
   stdio: 'inherit',
-  cwd: path.join(__dirname, '..'),
+  cwd: root,
 });
 
 console.log('Migrations completed. Starting server...');
-
-// Start the server
-execSync('node src/server.js', {
-  stdio: 'inherit',
-  cwd: path.join(__dirname, '..'),
-});
+execSync('node src/server.js', { stdio: 'inherit', cwd: root });
