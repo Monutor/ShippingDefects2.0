@@ -122,3 +122,29 @@ backend/
 │   │   └── broadcast.js # broadcast helper
 │   └── middleware/     # auth, error handling
 ```
+
+## Deployment on Render
+
+### 1. Create account
+Register at https://render.com
+
+### 2. Connect GitHub repository
+- Go to Dashboard -> New -> Web Service
+- Connect your GitHub repo
+- Select the backend folder
+
+### 3. Configure environment
+Render will auto-configure PostgreSQL from render.yaml
+- Set JWT_SECRET manually (auto-generated in render.yaml)
+- SSL certificates are included in certs/ folder
+
+### 4. Update frontend .env.production
+After deployment, update VITE_BACKEND_URL to your Render URL
+
+### 5. Rebuild frontend
+npm run deploy
+
+### Notes
+- Free tier: 750 hours/month, spins down after 15 min idle
+- First deploy may take 2-3 minutes (cold start)
+- Use 'Keep alive' ping or upgrade to prevent spin-down

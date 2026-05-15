@@ -37,5 +37,8 @@ export const config = {
   server: {
     host: process.env.BACKEND_HOST || '0.0.0.0',
     port: parseInt(process.env.BACKEND_PORT, 10) || 3001,
+    ssl: process.env.BACKEND_SSL === 'true',
+    sslKey: process.env.SSL_KEY_PATH || './certs/key.pem',
+    sslCert: process.env.SSL_CERT_PATH || './certs/cert.pem',
   },
 };

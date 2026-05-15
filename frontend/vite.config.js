@@ -26,7 +26,7 @@ export default defineConfig({
     }
   },
   // Для GitHub Pages
-  base: '/ShippingDefects/',
+  base: '/ShippingDefects2.0/',
   // Переименовываем файлы чтобы не было _ в начале
   build: {
     emptyOutDir: true, // Очищать dist перед сборкой

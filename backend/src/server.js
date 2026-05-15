@@ -10,6 +10,7 @@ import { config } from './config.js';
 import { query } from './db/index.js';
 import { initWebSocket } from './ws/index.js';
 
+
 const app = Fastify({
   logger: { level: process.env.LOG_LEVEL || 'info' },
 });
@@ -17,13 +18,14 @@ const app = Fastify({
 // CORS через @fastify/cors — allowlist доверенных origins (не wildcard с credentials!)
 await app.register(fastifyCors, {
   origin: [
-    'http://localhost:3000',           // локальная разработка (Vite с прокси)
+    'http://localhost:3000',           // >�?����>�?�?���? �?�����?���+�?�'��� (Vite �? ���?�?��?��)
     'http://127.0.0.1:3000',
-    'http://localhost:5173',           // Vite dev server (стандартный порт)
+    'http://localhost:5173',           // Vite dev server (�?�'���?�?���?�'�?�<�� ���?�?�')
     'https://warehouse-brain.github.io', // GitHub Pages production
-    'http://192.168.2.83:3000',        // локальный IP (ноутбук 1)
-    'http://192.168.2.98:3000',        // локальный IP (ноутбук 2)
-    ...((process.env.CORS_ALLOWED_ORIGINS || '').split(',').filter(Boolean)), // из .env для гибкости
+    'http://192.168.2.83:3000',        // >�?����>�?�?�<�� IP (�?�?�?�'�+�?�� 1)
+    'http://192.168.2.98:3000',        // >�?����>�?�?�<�� IP (�?�?�?�'�+�?�� 2)
+    'https://warehouse-brain-backend.onrender.com', // Render production
+    ...((process.env.CORS_ALLOWED_ORIGINS || '').split(',').filter(Boolean)), // ��� .env �?�>�? �?��+��?�?�'��
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -59,7 +61,7 @@ registerRoutes(app);
 // WebSocket sync endpoint
 initWebSocket(app);
 
-// Запуск сервера
+// -�����?�� ??��???��
 try {
   await app.listen({ host: config.server.host, port: config.server.port });
   console.log(`🚀 Backend: http://${config.server.host}:${config.server.port}`);
