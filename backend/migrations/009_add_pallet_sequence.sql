@@ -20,9 +20,10 @@ CREATE SEQUENCE IF NOT EXISTS seq_pallet_number;
 UPDATE pallets SET pallet_number = nextval('seq_pallet_number') WHERE pallet_number IS NULL;
 
 -- Устанавливаем sequence на следующий номер после макс существующего
+-- setval(..., 0, false) — false разрешает значение ниже минимума, nextval вернёт 1
 DO $$
 BEGIN
-    PERFORM setval('seq_pallet_number', (SELECT COALESCE(MAX(pallet_number), 0) FROM pallets));
+    PERFORM setval('seq_pallet_number', COALESCE((SELECT MAX(pallet_number) FROM pallets), 0), false);
 END $$;
 
 -- Обновляем unique partial index под новое имя колонки
