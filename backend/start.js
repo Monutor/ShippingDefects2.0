@@ -29,7 +29,7 @@ console.log('DATABASE_URL constructed, running migrations...');
 execSync(`npx node-pg-migrate --database ${db} --hostname ${host} --port ${port} --username ${user} --password ${pass} --migdir migrations up`, {
   stdio: 'inherit',
   cwd: root,
-  env: { ...process.env },
+  env: { ...process.env, DATABASE_URL },
 });
 
 console.log('Migrations completed. Starting server...');
