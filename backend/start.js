@@ -28,9 +28,9 @@ console.log('DATABASE_URL constructed, running migrations...');
 // Запускаем миграции с DATABASE_URL в env, cwd = backend (где лежит migrations/)
 execSync(`npx node-pg-migrate --database ${db} --hostname ${host} --port ${port} --username ${user} --password ${pass} --migdir migrations up`, {
   stdio: 'inherit',
-  cwd: root,
+  cwd: __dirname,
   env: { ...process.env, DATABASE_URL },
 });
 
 console.log('Migrations completed. Starting server...');
-execSync('node src/server.js', { stdio: 'inherit', cwd: root });
+execSync('node src/server.js', { stdio: 'inherit', cwd: __dirname });
