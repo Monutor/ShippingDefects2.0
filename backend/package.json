@@ -22,11 +22,11 @@
     "fastify": "^4.28.1",
     "jsonwebtoken": "^9.0.2",
     "node-forge": "^1.4.0",
+    "node-pg-migrate": "^7.6.0",
     "pem": "^1.14.8",
     "pg": "^8.13.0"
   },
   "devDependencies": {
-    "node-pg-migrate": "^7.6.0",
     "nodemon": "^3.1.4"
   }
 }
