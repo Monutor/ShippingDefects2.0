@@ -4,17 +4,13 @@
   <meta charset="UTF-8">
   <title>Redirecting...</title>
   <script>
-    // Трюк для GitHub Pages с history mode
-    // Перенаправляем все запросы на index.html для Vue Router
-    var path = window.location.href.replace(window.location.origin, '');
-    var basePath = '/ShippingDefects/'; // TODO: Укажите имя репозитория, например '/warehouse-brain-pwa/'
-    if (basePath && !path.startsWith(basePath)) {
-      path = basePath + path;
-    }
-    window.location.href = basePath + '/?' + (path.length > 0 ? 'redirect=' + encodeURIComponent(path) : '');
+    // GitHub Pages SPA redirect trick
+    // Store the requested path and redirect to index.html
+    sessionStorage.setItem('redirect_path', window.location.pathname + window.location.search + window.location.hash);
+    window.location.href = './';
   </script>
 </head>
 <body>
-  <p>Перенаправление...</p>
+  <p>Redirecting...</p>
 </body>
 </html>

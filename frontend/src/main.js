@@ -148,6 +148,16 @@ async function initializeApp() {
 app.use(pinia)
 app.use(router)
 
+// GitHub Pages SPA redirect handling
+const redirectPath = sessionStorage.getItem('redirect_path')
+if (redirectPath) {
+  sessionStorage.removeItem('redirect_path')
+  // Remove base path prefix if present
+  const basePath = '/ShippingDefects2.0'
+  const path = redirectPath.startsWith(basePath) ? redirectPath.slice(basePath.length) : redirectPath
+  router.replace(path || '/')
+}
+
 // Запускаем инициализацию после монтирования, если не на /login
 router.isReady().then(() => {
   if (router.currentRoute.value.path !== '/login') {
