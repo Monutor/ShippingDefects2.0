@@ -18,14 +18,12 @@ const app = Fastify({
 // CORS через @fastify/cors — allowlist доверенных origins (не wildcard с credentials!)
 await app.register(fastifyCors, {
   origin: [
-    'http://localhost:3000',           // >�?����>�?�?���? �?�����?���+�?�'��� (Vite �? ���?�?��?��)
+    'http://localhost:3000',
     'http://127.0.0.1:3000',
-    'http://localhost:5173',           // Vite dev server (�?�'���?�?���?�'�?�<�� ���?�?�')
-    'https://warehouse-brain.github.io', // GitHub Pages production
-    'http://192.168.2.83:3000',        // >�?����>�?�?�<�� IP (�?�?�?�'�+�?�� 1)
-    'http://192.168.2.98:3000',        // >�?����>�?�?�<�� IP (�?�?�?�'�+�?�� 2)
-    'https://warehouse-brain-backend.onrender.com', // Render production
-    ...((process.env.CORS_ALLOWED_ORIGINS || '').split(',').filter(Boolean)), // ��� .env �?�>�? �?��+��?�?�'��
+    'http://localhost:5173',
+    'https://monutor.github.io',
+    'https://warehouse-brain-backend.onrender.com',
+    ...((process.env.CORS_ALLOWED_ORIGINS || '').split(',').filter(Boolean)),
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
