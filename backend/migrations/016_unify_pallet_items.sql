@@ -11,6 +11,7 @@ ALTER TABLE pallet_items ADD COLUMN IF NOT EXISTS comment TEXT;
 ALTER TABLE pallet_items ADD COLUMN IF NOT EXISTS scanned_at TIMESTAMP WITH TIME ZONE;
 
 -- Заполняем данные из item_data_jsonb для существующих записей
+-- где barcode ИЛИ name пустые
 UPDATE pallet_items 
 SET barcode = COALESCE(item_data->>'barcode', ''),
     name = COALESCE(item_data->>'name', ''),
@@ -18,7 +19,8 @@ SET barcode = COALESCE(item_data->>'barcode', ''),
     model = COALESCE(item_data->>'model', ''),
     defect_type = COALESCE(item_data->>'defect_type', ''),
     comment = COALESCE(item_data->>'comment', '')
-WHERE barcode IS NULL;
+WHERE barcode IS NULL OR barcode = '' 
+   OR name IS NULL OR name = '';
 
 -- Заполняем scanned_at из item_data_jsonb если есть
 UPDATE pallet_items 

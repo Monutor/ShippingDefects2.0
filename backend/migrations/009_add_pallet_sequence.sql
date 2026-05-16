@@ -4,7 +4,14 @@
 
 -- Переименовываем колонку для ясности: box_number относится к коробам, у паллетов свой номер
 ALTER TABLE pallets RENAME COLUMN box_number TO pallet_number;
-ALTER INDEX ux_pallets_finished_box_number RENAME TO ux_pallets_finished_pallet_number;
+
+-- Переименовываем индекс, если он существует
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'ux_pallets_finished_box_number') THEN
+        EXECUTE 'ALTER INDEX ux_pallets_finished_box_number RENAME TO ux_pallets_finished_pallet_number';
+    END IF;
+END $$;
 
 -- Создаём sequence для нумерации паллетов (если не создана)
 CREATE SEQUENCE IF NOT EXISTS seq_pallet_number;

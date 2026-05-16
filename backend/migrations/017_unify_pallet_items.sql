@@ -2,18 +2,22 @@
 -- Унифицируем pallet_items: заполняем явные колонки для всех существующих записей
 -- Миграция делает паллеты совместимыми с архитектурой миксов (box_items)
 
--- Заполняем barcode/name/brand/model/defect_type/comment из item_data_jsonb
--- для всех существующих записей, где эти поля пустые
+-- Заполняем barcode/name/brand/model/defect_type/comment для записей где они пустые
+-- (на случай если 016 не захватила какие-то записи)
 UPDATE pallet_items
 SET 
-    barcode = COALESCE(barcode, ''),
-    name = COALESCE(name, ''),
-    brand = COALESCE(brand, ''),
-    model = COALESCE(model, ''),
-    defect_type = COALESCE(defect_type, ''),
-    comment = COALESCE(comment, '')
+    barcode = COALESCE(NULLIF(barcode, ''), ''),
+    name = COALESCE(NULLIF(name, ''), ''),
+    brand = COALESCE(NULLIF(brand, ''), ''),
+    model = COALESCE(NULLIF(model, ''), ''),
+    defect_type = COALESCE(NULLIF(defect_type, ''), ''),
+    comment = COALESCE(NULLIF(comment, ''), '')
 WHERE barcode IS NULL OR barcode = '' 
-   OR name IS NULL OR name = '';
+   OR name IS NULL OR name = ''
+   OR brand IS NULL
+   OR model IS NULL
+   OR defect_type IS NULL
+   OR comment IS NULL;
 
 -- Добавляем NOT NULL ограничение для консистентности с box_items
 ALTER TABLE pallet_items ALTER COLUMN barcode SET NOT NULL;
