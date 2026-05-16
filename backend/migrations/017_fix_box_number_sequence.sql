@@ -10,7 +10,15 @@ DROP SEQUENCE IF EXISTS box_number_seq;
 CREATE SEQUENCE box_number_seq START WITH 1 INCREMENT BY 1 NO MINVALUE NO MAXVALUE CACHE 1;
 
 -- Синхронизируем с существующими данными
--- setval(..., 0, false) — false разрешает значение ниже минимума, nextval вернёт 1
-SELECT setval('box_number_seq', COALESCE((SELECT MAX(box_number) FROM boxes), 0), false);
+-- Пропускаем если таблица пуста — sequence останется на 1
+DO $$
+DECLARE
+    max_val INTEGER;
+BEGIN
+    SELECT MAX(box_number) INTO max_val FROM boxes;
+    IF max_val IS NOT NULL THEN
+        PERFORM setval('box_number_seq', max_val);
+    END IF;
+END $$;
 
 COMMIT;
