@@ -6,8 +6,8 @@
   "background_color": "#ffffff",
   "display": "standalone",
   "orientation": "portrait",
-  "scope": "/ShippingDefects/",
-  "start_url": "/ShippingDefects/",
+  "scope": "/ShippingDefects2.0/",
+  "start_url": "/ShippingDefects2.0/",
   "icons": [
     {
       "src": "img/scanning-scan-favicon.svg",
