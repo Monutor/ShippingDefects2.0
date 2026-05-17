@@ -57,13 +57,10 @@ export class BarcodeScanner {
           onScanSuccess(decodedText, decodedResult)
         },
         (errorMessage) => {
-          // Игнорируем ошибки сканирования (это нормально при поиске кода)
-          // console.debug('Scanning:', errorMessage)
         }
       )
       this.isScanning = true
     } catch (error) {
-      console.error('Ошибка запуска сканера:', error)
       
       // Пробуем альтернативный способ - по deviceId
       if (error.message?.includes('Permission') || error.message?.includes('NotAllowed')) {
@@ -89,7 +86,6 @@ export class BarcodeScanner {
       await this.scanner.stop()
       this.isScanning = false
     } catch (error) {
-      console.error('Ошибка остановки сканера:', error)
       this.isScanning = false
     }
   }
@@ -105,7 +101,6 @@ export class BarcodeScanner {
         }
         await this.scanner.clear()
       } catch (error) {
-        console.error('Ошибка очистки сканера:', error)
       }
       this.scanner = null
       this.isScanning = false
@@ -141,13 +136,11 @@ export async function checkCameraSupport() {
   // BUG-233 fix: разрешаем http://192.168.*.* для локальной сети
   const isLocalNetwork = window.location.hostname.match(/^192\.168\.\d+\.\d+$/)
   if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && !isLocalNetwork) {
-    console.warn('Камера требует HTTPS или localhost')
     return false
   }
 
   // Проверка наличия getUserMedia
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    console.warn('Браузер не поддерживает доступ к камере')
     return false
   }
 
@@ -156,8 +149,7 @@ export async function checkCameraSupport() {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
     stream.getTracks().forEach(track => track.stop())
     return true
-  } catch (error) {
-    console.error('Ошибка проверки камеры:', error)
+  } catch {
     return false
   }
 }

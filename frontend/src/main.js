@@ -35,14 +35,12 @@ app.component('VanIcon', Icon)
 if ('serviceWorker' in navigator && import.meta.env.DEV) {
   caches.keys().then(cacheNames => {
     cacheNames.forEach(cacheName => {
-      console.log('🗑️ [DEV] Очистка кэша:', cacheName)
       caches.delete(cacheName)
     })
   })
 
   navigator.serviceWorker.getRegistrations().then(registrations => {
     registrations.forEach(registration => {
-      console.log('⚠️ [DEV] Unregister Service Worker')
       registration.unregister()
     })
   })
@@ -55,13 +53,10 @@ let isOffline = false
 
 function showOfflineBanner(show) {
   if (show && !isOffline) {
-    console.log('📡 Офлайн: данные сохраняются локально')
     window.showToast('⚠️ Нет подключения к сети')
-    // Dispatch event for App.vue to update reactive state
     window.dispatchEvent(new CustomEvent('network-status', { detail: { online: false } }))
     isOffline = true
   } else if (!show && isOffline) {
-    console.log('📡 Онлайн: синхронизация возобновлена')
     window.dispatchEvent(new CustomEvent('network-status', { detail: { online: true } }))
     isOffline = false
   }
@@ -101,18 +96,11 @@ async function initializeApp() {
   const separateStore = useSeparateStore()
   const palletStore = usePalletStore()
 
-  // Восстановить collector profile из auth session (warehouse-brain-user)
-  try {
-    const { useCollectorStore } = await import('@/stores/collector')
-    const collectorStore = useCollectorStore()
-    collectorStore.restoreFromAuthSession()
-  } catch {}
-
   // Все данные загружаются параллельно — один упавший load не ломает остальные
   const results = await Promise.allSettled([
     brainStore.loadFromBackend(),
     boxesStore.loadBoxes(),
-    boxesStore.loadActiveBox(),
+    // loadActiveBox убран — MixView/PalletView загружают активные короба сами через loadAllActiveBoxes/loadAllActivePallets
     separateStore.loadSeparateItems(),
     palletStore.loadPallets()
   ])
@@ -121,7 +109,6 @@ async function initializeApp() {
   const criticalFailures = []
   for (let i = 0; i < results.length; i++) {
     if (results[i].status === 'rejected') {
-      console.warn(`⚠️ Инициализация #${i + 1} провалилась:`, results[i].reason)
       const names = ['brain', 'boxes', 'activeBox', 'separate', 'pallet']
       if (['brain', 'boxes'].includes(names[i])) {
         criticalFailures.push(names[i])
@@ -136,17 +123,28 @@ async function initializeApp() {
 
   // Периодическая синхронизация активного короба (каждые 5 минут)
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  let syncIntervalId = null
   if (boxesStore.currentBox && uuidRegex.test(boxesStore.currentBox.id)) {
-    setInterval(() => {
+    syncIntervalId = setInterval(() => {
       if (navigator.onLine) boxesStore.loadBoxes()
     }, 300000) // каждые 5 минут
   }
 
-  console.log('✅ Server-first инициализация завершена')
+  // Очистка интервала при logout (храним глобально для доступа из App.vue)
+  window._appCleanup = {
+    syncInterval: () => { if (syncIntervalId) clearInterval(syncIntervalId) }
+  }
 }
 
 app.use(pinia)
 app.use(router)
+
+// Восстановить collector profile из auth session ДО монтирования — предотвращает гонку состояний
+try {
+  const { useCollectorStore } = await import('@/stores/collector')
+  const collectorStore = useCollectorStore()
+  collectorStore.restoreFromAuthSession()
+} catch {}
 
 // GitHub Pages SPA redirect handling
 const redirectPath = sessionStorage.getItem('redirect_path')

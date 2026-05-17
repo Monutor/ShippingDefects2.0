@@ -18,10 +18,7 @@ const collectorStore = useCollectorStore()
 watch(
   () => boxesStore.currentBox?.items?.length,
   (newLength) => {
-    console.log('🔄 MixView: items length changed to', newLength)
-    // nextTick гарантирует что Vue сделает re-render
     nextTick(() => {
-      console.log('✅ MixView: UI refreshed')
     })
   }
 )
@@ -47,7 +44,6 @@ const _allActiveBoxes = ref([])
 // WS обработчики
 function boxCreatedHandler(msg) {
   if (msg.box_id && !_allActiveBoxes.value.find(b => b.id === msg.box_id)) {
-    console.log('📦 WS box_created:', msg.collector_id)
     const newBox = { id: msg.box_id, collector_id: msg.collector_id }
 
     if (msg.collector_id === collectorStore.employeeId) {
@@ -60,6 +56,15 @@ function boxCreatedHandler(msg) {
   }
 }
 
+function boxFinishedHandler(msg) {
+  // Удаляем из активных если это наш короб
+  if (boxesStore.currentBox?.id === msg.box_id) {
+    boxesStore.currentBox = null
+  }
+  activeBoxes.value = activeBoxes.value.filter(b => b.id !== msg.box_id)
+  _allActiveBoxes.value = _allActiveBoxes.value.filter(b => b.id !== msg.box_id)
+}
+
 // Загрузка активных контейнеров
 async function loadActiveContainers() {
   if (!navigator.onLine) return
@@ -68,8 +73,6 @@ async function loadActiveContainers() {
 
   activeBoxes.value = allBoxes.filter(b => b.collector_id === collectorStore.employeeId)
   _allActiveBoxes.value = allBoxes
-
-  console.log('📡 Активные миксы:', activeBoxes.value.length, 'своих')
 }
 
 // BUG-220 fix: выбор короба с проверкой владельца
@@ -85,9 +88,7 @@ function selectBox(box) {
   // Для чужих миксов items уже загружены при loadAllActiveBoxes
   // Но для уверенности — можно догрузить если нет items
   if (!box.itemsLoaded && !box.items?.length) {
-    boxesStore.refreshBoxItems(box.id).then(items => {
-      console.log('📦 MixView: загружены товары микса', box.name, items.length)
-    })
+    boxesStore.refreshBoxItems(box.id).then(() => {})
   }
 }
 
@@ -99,7 +100,6 @@ async function createAndSelectNewBox() {
   if (activeBoxes.value.length > 0) {
     const last = activeBoxes.value[activeBoxes.value.length - 1]
     if (boxesStore.currentBox?.id === oldBoxId) {
-      console.log('📦 currentBox не обновился WS — выбираем вручную')
     }
     selectBox(last)
   }
@@ -112,13 +112,6 @@ function handleStopScanner() {
 }
 
 async function processScannedCode(barcode) {
-  // isProcessingScan НЕ проверяем здесь — он установлен в handleTsdInput ПЕРЕД вызовом.
-  // Его задача: блокировать повторные нажатия Enter, а не внутреннюю логику функции.
-  console.log('🔍 processScannedCode input:', barcode, 'processing states:', {
-    isProcessingTsd: isProcessingTsd.value,
-    isProcessingScan: isProcessingScan.value
-  })
-
   // Проверяем стоп-товар
   const item = brainStore.findByBarcode(barcode)
   if (item?.comment && /не согласован|ждем согласования|ждем решения/i.test(item.comment)) {
@@ -129,7 +122,6 @@ async function processScannedCode(barcode) {
 
   // Добавляем префикс если нужно
   const normalizedBarcode = ensurePrefix(parseBarcodeToBrainNumber(barcode))
-  console.log('🔍 parsed:', barcode, '→', normalizedBarcode)
 
   if (!normalizedBarcode) {
     window.showToast(`Неверный формат: ${barcode}`)
@@ -139,18 +131,15 @@ async function processScannedCode(barcode) {
   // Проверяем глобальный дубликат
   const duplicateInOthers = boxesStore.checkGlobalDuplicate(normalizedBarcode)
   if (duplicateInOthers) {
-    window.showToast(`⚠️ Товар уже в миксе №${duplicateInOthers.boxNumber}`, 5000, 'error')
+    window.showToast(`️ Товар уже в миксе №${duplicateInOthers.boxNumber}`, 5000, 'error')
     return null
   }
 
-  // Добавляем товар в текущий короб
-  console.log('➕ addItemToCurrentBox:', { barcode: normalizedBarcode, itemExists: !!item })
   const result = await boxesStore.addItemToCurrentBox(item || { number: normalizedBarcode, name: `Товар ${normalizedBarcode}` })
   if (result.success) {
     window.showToast(`✅ Товар добавлен`, 1000, 'success')
     return { name: item?.name || `Товар ${normalizedBarcode}`, barcode }
   } else {
-    console.error('❌ addItemToCurrentBox failed:', result)
     if (result.error === 'duplicate_global') {
       window.showToast(`⚠️ Товар уже в миксе №${result.boxNumber}`, 5000, 'error')
     } else if (result.error === 'duplicate_server') {
@@ -165,16 +154,13 @@ async function processScannedCode(barcode) {
 }
 
 async function handleTsdInput() {
-  if (isProcessingScan.value) return // Блокируем повторные нажатия
+  if (isProcessingScan.value) return
   let input = tsdInput.value?.trim()
-  console.log('🔍 handleTsdInput raw:', JSON.stringify(input))
   if (!input) return
 
   isProcessingScan.value = true
   const parsed = parseBarcodeToBrainNumber(input)
-  console.log('🔍 parseBarcodeToBrainNumber:', input, '→', parsed)
   let barcode = ensurePrefix(parsed)
-  console.log('🔍 after ensurePrefix:', barcode)
   if (!barcode) {
     window.showToast(`Неверный формат: ${input}`)
     isProcessingScan.value = false
@@ -182,7 +168,6 @@ async function handleTsdInput() {
     return
   }
 
-  console.log('▶️ calling processScannedCode with:', barcode)
   await processScannedCode(barcode)
   tsdInput.value = ''
   nextTick(() => {
@@ -207,7 +192,6 @@ async function startScanner() {
   await new Promise(resolve => setTimeout(resolve, 300))
   
   if (!document.getElementById(scannerElementId)) {
-    console.error('❌ Scanner element not found in DOM')
     showScanner.value = false
     return
   }
@@ -223,8 +207,7 @@ async function startScanner() {
       showScanner.value = false
       isScanning.value = false
     },
-    onError: (err) => {
-      console.error('Scanner error:', err)
+    onError: () => {
       isScanning.value = false
     }
   })
@@ -271,7 +254,7 @@ async function confirmFinish() {
       boxesStore.currentBox = null
     }
   } else {
-    window.showToast('❌ Ошибка завершения микса')
+    window.showToast(` Ошибка завершения микса: ${boxesStore.syncError || 'неизвестная ошибка'}`)
   }
 }
 
@@ -307,6 +290,7 @@ const isContainerOwner = computed(() => {
 onMounted(async () => {
   // Подписка на WS события
   ws.on('box_created', boxCreatedHandler)
+  ws.on('box_finished', boxFinishedHandler)
   
   // Загружаем все активные короба
   if (navigator.onLine) await loadActiveContainers()
@@ -324,6 +308,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   ws.off('box_created', boxCreatedHandler)
+  ws.off('box_finished', boxFinishedHandler)
   stopScanner()
   window.removeEventListener('keydown', handleKeyDown)
 })
@@ -338,7 +323,7 @@ function handleKeyDown(event) {
 </script>
 
 <template>
-  <div class="mix-view min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 pb-20">
+  <div class="mix-view bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
     <!-- Nav Bar -->
     <NavBar 
       title="Миксы" 
@@ -360,11 +345,30 @@ function handleKeyDown(event) {
       </div>
 
       <!-- Режим сканирования -->
-      <div v-if="!boxesStore.currentBox" class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4">
-        <h3 class="font-semibold text-slate-100 mb-3">Создайте микс для начала работы</h3>
-        <Button variant="primary" block @click="createAndSelectNewBox()">
-          📦 Создать микс
-        </Button>
+      <!-- Пустое состояние — нет активного короба и нет активных коробов -->
+      <div v-if="!boxesStore.currentBox && activeBoxes.length === 0" class="absolute inset-0 flex flex-col items-center justify-center">
+        <button
+          @click="createAndSelectNewBox()"
+          class="w-20 h-20 rounded-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 flex items-center justify-center transition-colors shadow-lg shadow-blue-600/30"
+        >
+          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+        </button>
+        <p class="mt-4 text-slate-400 text-sm">Создайте микс для начала работы</p>
+      </div>
+
+      <!-- Пустое состояние — нет активного короба, но есть активные короба -->
+      <div v-if="!boxesStore.currentBox && activeBoxes.length > 0" class="flex flex-col items-center justify-center py-8">
+        <button
+          @click="createAndSelectNewBox()"
+          class="w-16 h-16 rounded-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 flex items-center justify-center transition-colors shadow-lg shadow-blue-600/30"
+        >
+          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+        </button>
+        <p class="mt-3 text-slate-400 text-sm">Создайте микс для начала работы</p>
       </div>
 
       <!-- Список активных коробов -->
@@ -520,10 +524,6 @@ function handleKeyDown(event) {
         </div>
       </div>
 
-      <!-- Подсказка когда нет активного контейнера -->
-      <div v-if="!boxesStore.currentBox" class="text-center py-6">
-        <p class="text-slate-400 text-sm">Создайте микс или выберите существующий</p>
-      </div>
     </main>
 
     <!-- Модальное окно сканера -->
@@ -597,10 +597,6 @@ function handleKeyDown(event) {
 </template>
 
 <style scoped>
-.custom-btn-primary {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border-color: #2563eb;
-}
 .custom-btn-secondary {
   background: rgba(107, 114, 128, 0.2);
   border-color: rgba(107, 114, 128, 0.3);
@@ -618,19 +614,6 @@ function handleKeyDown(event) {
   transform: translateX(4px);
 }
 
-.new-badge {
-  animation: badgePulse 1.5s ease-in-out infinite;
-}
-
-@keyframes badgePulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.item-new-glow {
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
-}
-
 .scrollbar-thin::-webkit-scrollbar {
   width: 4px;
 }
@@ -641,14 +624,6 @@ function handleKeyDown(event) {
 .scrollbar-thin::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 8px;
-}
-
-.status-bar {
-  /* Убран position: sticky чтобы не висел поверх контента при скролле */
-}
-
-.box-actions {
-  /* Убран фон — кнопки без подложки */
 }
 
 .mix-view {

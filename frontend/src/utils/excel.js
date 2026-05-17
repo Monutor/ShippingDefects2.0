@@ -1,7 +1,6 @@
 import * as XLSX from 'xlsx'
 import Excel from 'exceljs'
 import { useBoxesStore } from '@/stores/boxes'
-import { usePalletStore } from '@/stores/pallet'
 import { db } from '@/lib/api.js'
 
 /**
@@ -81,7 +80,6 @@ export function exportToExcel(data, filename) {
 
         return { success: true, filename: fullName }
     } catch (error) {
-        console.error('Ошибка экспорта в Excel:', error)
         return { success: false, error: error.message }
     }
 }
@@ -319,7 +317,6 @@ export async function exportBoxToExcel(box, collector = {}) {
 
         return { success: true, filename: fullName }
     } catch (error) {
-        console.error('Ошибка экспорта в Excel:', error)
         return { success: false, error: error.message }
     }
 }
@@ -470,7 +467,6 @@ export async function exportSeparateToExcel(items, collector = {}) {
 
         return { success: true, filename: fullName }
     } catch (error) {
-        console.error('Ошибка экспорта в Excel:', error)
         return { success: false, error: error.message }
     }
 }
@@ -485,7 +481,8 @@ export async function exportPalletToExcel(pallet, collector = {}) {
 
     try {
         // BUG-231 fix: передаём store как параметр вместо вызова вне setup
-        const boxesStore = await import('@/stores/boxes.js')
+        const boxesStoreModule = await import('@/stores/boxes.js')
+        const boxesStore = boxesStoreModule.useBoxesStore()
 
         // Загружаем items с сервера
         let palletItems = null
@@ -547,9 +544,11 @@ export async function exportPalletToExcel(pallet, collector = {}) {
         ]
 
         for (const item of palletItems) {
-            console.log(item)
             if (item.source_type === 'box') {
-                contentSheet.addRow({ type: '', identifier: `Микс #${item.order_num || ''}`, name: '', article: '', comment: '—', scannedAt: '' })
+                // Берём номер микса из boxesStore по source_id — order_num может быть неверным
+                const box = boxesStore.boxes?.find(b => b.id === item.source_id)
+                const boxNumber = box?.number || box?.box_number || item.order_num || ''
+                contentSheet.addRow({ type: '', identifier: `Микс #${boxNumber}`, name: '', article: '', comment: '—', scannedAt: '' })
                 let boxItems = item.item_data?.items
                 if (!boxItems || boxItems.length === 0) {
                     boxItems = item._full_data?.items
@@ -675,7 +674,6 @@ export async function exportPalletToExcel(pallet, collector = {}) {
 
         return { success: true, filename: fullName }
     } catch (error) {
-        console.error('Ошибка экспорта паллета в Excel:', error)
         return { success: false, error: error.message }
     }
 }
@@ -758,7 +756,6 @@ export async function exportPalletsToExcel(palletItems, filename = 'Все_па�
 
         return { success: true, filename: link.download }
     } catch (error) {
-        console.error('Ошибка экспорта паллетов в Excel:', error)
         return { success: false, error: error.message }
     }
 }

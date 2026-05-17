@@ -120,10 +120,9 @@ async function startScanner() {
         if (navigator.vibrate) navigator.vibrate(50)
         handleScanResult(scannedCode)
       },
-      (error) => console.error('Ошибка сканера:', error)
+      () => {}
     )
   } catch (error) {
-    console.error('Ошибка запуска сканера:', error)
     window.showToast('Ошибка доступа к камере')
     stopScanner()
   }

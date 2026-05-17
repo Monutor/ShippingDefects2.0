@@ -16,23 +16,18 @@ export function parseBarcodeToBrainNumber(barcode) {
   if (!barcode) return null
 
   let cleaned = barcode.trim().toUpperCase()
-  console.log('🔍 parseBarcodeToBrainNumber input:', JSON.stringify(barcode), '→', JSON.stringify(cleaned))
 
-  // Кириллическая «Я» (русская раскладка, клавиша Z) → латинская «Z»
+  // Кириллическая «Я»
   cleaned = cleaned.replace(/^Я/, 'Z')
 
-  // Если уже в формате 187/45202 - возвращаем как есть
+  // Если уже в формате 187/45202
   if (/^\d+\/\d+$/.test(cleaned)) {
-    console.log('✅ format 187/XXXX detected:', cleaned)
     return cleaned
   }
 
-  // Если просто номер без префикса (например "45328") — добавляем 187/
-  // Это для ручного ввода через ТСД когда пользователь знает только номер товара
+  // Если просто номер без префикса
   if (/^\d+$/.test(cleaned) && cleaned.length >= 4 && cleaned.length <= 6) {
-    const result = `187/${cleaned}`
-    console.log('✅ simple number detected, returning:', result)
-    return result
+    return `187/${cleaned}`
   }
 
   // Убираем букву Z в начале
@@ -42,41 +37,28 @@ export function parseBarcodeToBrainNumber(barcode) {
 
   // Проверяем, что остались только цифры
   if (!/^\d+$/.test(cleaned)) {
-    console.log('❌ not all digits after removing Z')
     return null
   }
 
-  // Работаем с исходной строкой (без удаления ведущих нулей) — позиционный анализ по длине
-  // Формат: Z + категория(1) + part1(N) + разделитель(00) + part2(M)
-  // Пример: Z01870045328 → 0+187+00+4532 (11 цифр после Z)
-  //         Z018700453282 → 0+187+00+45328 (12 цифр после Z)
   const len = cleaned.length
-  console.log('🔍 after Z removal, length:', len, 'cleaned:', cleaned)
 
   if (len === 12) {
-    // категория(1) + part1(3) + разделитель(00) + part2(5)
     return `${cleaned.slice(1, 4)}/${cleaned.slice(6, 11)}`
   }
 
   if (len === 11) {
-    // категория(1) + part1(3) + разделитель(00) + part2(4)
     return `${cleaned.slice(1, 4)}/${cleaned.slice(6, 10)}`
   }
 
   if (len === 10) {
-    // категория(1) + part1(3) + разделитель(00) + part2(5)
     return `${cleaned.slice(1, 4)}/${cleaned.slice(6, 11)}`
   }
 
-  // 13 цифр — EAN-13 или аналог: добавляем 187/ к исходному номеру
+  // 13 цифр — EAN-13
   if (len === 13) {
-    const result = `187/${cleaned}`
-    console.log('✅ EAN-13 detected, returning:', result)
-    return result
+    return `187/${cleaned}`
   }
 
-  // Если длина не совпадает, возвращаем null (не распознано)
-  console.log('❌ unknown length:', len)
   return null
 }
 

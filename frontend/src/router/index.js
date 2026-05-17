@@ -12,7 +12,6 @@ window.__setMaintenanceMode = function(enabled, loading = false) {
 }
 
 const router = createRouter({
-  mode: 'history',
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
@@ -48,11 +47,6 @@ const router = createRouter({
       path: '/pallet/:palletId?',
       name: 'pallet-detail',
       component: () => import('@/views/PalletDetailView.vue')
-    },
-    {
-      path: '/pallets',
-      name: 'pallets',
-      component: () => import('@/views/PalletView.vue')
     },
     {
       path: '/mix/:boxId?',

@@ -24,8 +24,6 @@ watch(
   () => palletStore.palletItemsVersion,
   (version) => {
     if (version !== undefined && version > _palletRefreshCounter.value) {
-      console.log('🔄 PalletView: palletItemsVersion changed to', version)
-      // Увеличиваем counter чтобы Vue пересчитал computed properties
       _palletRefreshCounter.value = version
     }
   },
@@ -37,7 +35,6 @@ watch(
   () => palletStore.currentPallet?.items,
   (newItems, oldItems) => {
     if (newItems && newItems !== oldItems) {
-      console.log('🔄 PalletView: items array changed directly')
       _palletRefreshCounter.value++
     }
   },
@@ -76,7 +73,6 @@ const palletItemsWithDetails = computed(() => {
       }
 
       if (!data.number && data.name.startsWith('Товар 1')) {
-        console.log('⚠️ Пропускаю пустой pallet item:', ref)
         continue
       }
 
@@ -96,7 +92,7 @@ const palletItemsWithDetails = computed(() => {
         }
       }
 
-      result.push(data)
+      result.push({ ...data, source_id: ref.source_id, source_type: ref.source_type })
     } else if (ref.source_type === 'separate_item') {
       let data = ref._full_data
 
@@ -125,7 +121,7 @@ const palletItemsWithDetails = computed(() => {
         data = { number: String(ref.source_id), name: 'Товар', article: '' }
       }
 
-      result.push({ ...data })
+      result.push({ ...data, source_id: ref.source_id, source_type: ref.source_type })
     } else if (ref.source_type === 'box') {
       const box = palletStore.availableBoxes.find(b => b.id === ref.source_id)
       if (box) {
@@ -134,7 +130,9 @@ const palletItemsWithDetails = computed(() => {
           name: `${box.name} (${box.itemCount || 0} товаров)`,
           article: '',
           comment: 'Готовый микс',
-          isBoxRef: true
+          isBoxRef: true,
+          source_id: ref.source_id,
+          source_type: 'box'
         })
       } else if (ref._boxNumber || ref._boxName) {
         result.push({
@@ -142,7 +140,9 @@ const palletItemsWithDetails = computed(() => {
           name: `${ref._boxName || 'Микс'} (${ref._boxItemCount || 0} товаров)`,
           article: '',
           comment: 'Готовый микс',
-          isBoxRef: true
+          isBoxRef: true,
+          source_id: ref.source_id,
+          source_type: 'box'
         })
       }
     }
@@ -180,26 +180,36 @@ async function loadAvailableMixes() {
     const result = await db.boxes.getAll()
     if (result?.data) {
       const boxes = (result.data || []).filter(b => b.status === 'finished')
-      availableMixes.value = await Promise.all(boxes.map(async box => {
-        let itemCount = 0
-        let boxItems = []
-        try {
-          const itemsResult = await db.boxItems.getByBoxId(box.id)
-          boxItems = itemsResult?.data || []
-          itemCount = boxItems.length
-        } catch {}
-        return {
-          id: box.id,
-          number: box.box_number || 0,
-          name: box.name || `Микс ${box.box_number}`,
-          itemCount,
-          items: boxItems,
-          createdAt: box.created_at
+      
+      // Собираем ID миксов из текущего паллета (локальные данные всегда актуальны)
+      const usedBoxIds = new Set()
+      if (palletStore.currentPallet?.items) {
+        for (const item of palletStore.currentPallet.items) {
+          if (item.source_type === 'box') usedBoxIds.add(item.source_id)
         }
-      }))
+      }
+      
+      availableMixes.value = await Promise.all(boxes
+        .filter(b => !usedBoxIds.has(b.id))
+        .map(async box => {
+          let itemCount = 0
+          let boxItems = []
+          try {
+            const itemsResult = await db.boxItems.getByBoxId(box.id)
+            boxItems = itemsResult?.data || []
+            itemCount = boxItems.length
+          } catch {}
+          return {
+            id: box.id,
+            number: box.box_number || 0,
+            name: box.name || `Микс ${box.box_number}`,
+            itemCount,
+            items: boxItems,
+            createdAt: box.created_at
+          }
+        }))
     }
   } catch (err) {
-    console.error('Ошибка загрузки миксов:', err)
   } finally {
     isLoadingMixes.value = false
   }
@@ -221,7 +231,6 @@ async function addMixToPallet(box) {
 // WS обработчики
 function palletCreatedHandler(msg) {
   if (msg.pallet_id && !_allActivePallets.value.find(p => p.id === msg.pallet_id)) {
-    console.log('🏗️ WS pallet_created:', msg.collector_id)
     const newPallet = { id: msg.pallet_id, collector_id: msg.collector_id }
 
     if (msg.collector_id === collectorStore.employeeId) {
@@ -244,8 +253,6 @@ async function loadActiveContainers() {
 
   // Сохраняем все для loadActivePalletById (нужен полный массив всех паллетов)
   allPalletsGlobal = allPallets
-
-  console.log('📡 Активные паллеты:', activePallets.value.length, 'своих')
 }
 
 // Выбор активного паллета
@@ -271,13 +278,6 @@ function handleStopScanner() {
 }
 
 async function processScannedCode(barcode) {
-  // isProcessingScan НЕ проверяем здесь — он установлен в handleTsdInput ПЕРЕД вызовом.
-  // Его задача: блокировать повторные нажатия Enter, а не внутреннюю логику функции.
-  console.log('🔍 processScannedCode input:', barcode, 'processing states:', {
-    isProcessingTsd: isProcessingTsd.value,
-    isProcessingScan: isProcessingScan.value
-  })
-
   // Проверяем стоп-товар
   const item = brainStore.findByBarcode(barcode)
   if (item?.comment && /не согласован|ждем согласования|ждем решения/i.test(item.comment)) {
@@ -288,22 +288,21 @@ async function processScannedCode(barcode) {
 
   // Добавляем префикс если нужно
   const normalizedBarcode = ensurePrefix(parseBarcodeToBrainNumber(barcode))
-  console.log('🔍 parsed:', barcode, '→', normalizedBarcode)
 
   if (!normalizedBarcode) {
     window.showToast(`Неверный формат: ${barcode}`)
     return null
   }
 
-  // Проверяем глобальный дубликат
-  const duplicateInOthers = palletStore.checkGlobalDuplicate(normalizedBarcode)
+  // Проверяем глобальный дубликат (async — проверяет и паллеты, и миксы)
+  const duplicateInOthers = await palletStore.checkGlobalDuplicate(normalizedBarcode)
   if (duplicateInOthers) {
-    window.showToast(`⚠️ Товар уже в паллете №${duplicateInOthers.boxNumber}`, 5000, 'error')
+    const containerType = duplicateInOthers.type === 'box' ? 'миксе' : 'паллете'
+    window.showToast(`️ Товар уже в ${containerType} №${duplicateInOthers.boxNumber}`, 5000, 'error')
     return null
   }
 
   // Добавляем товар в текущий паллет
-  console.log('➕ addInlineItemToPallet:', { barcode: normalizedBarcode, itemExists: !!item })
   const scannedAt = new Date().toISOString()
   const itemData = item 
     ? { number: normalizedBarcode, name: item.name, article: item.article, comment: item.comment, scannedAt }
@@ -312,30 +311,25 @@ async function processScannedCode(barcode) {
   if (result.success) {
     window.showToast(`✅ Товар добавлен`, 1000, 'success')
 
-    // FIX: принудительное обновление UI — computed property может не пересчитаться
+    // FIX: принудительное обновление UI
     nextTick(() => {
-      console.log('🔄 PalletView: force refresh after add item')
     })
 
     return { name: item?.name || `Товар ${normalizedBarcode}`, barcode }
   } else {
-    console.error('❌ addInlineItemToPallet failed:', result)
-    window.showToast(`⚠️ Не удалось добавить товар`, 3000, 'error')
+    window.showToast(`️ Не удалось добавить товар`, 3000, 'error')
     return null
   }
 }
 
 async function handleTsdInput() {
-  if (isProcessingScan.value) return // Блокируем повторные нажатия
+  if (isProcessingScan.value) return
   let input = tsdInput.value?.trim()
-  console.log('🔍 handleTsdInput raw:', JSON.stringify(input))
   if (!input) return
 
   isProcessingScan.value = true
   const parsed = parseBarcodeToBrainNumber(input)
-  console.log('🔍 parseBarcodeToBrainNumber:', input, '→', parsed)
   let barcode = ensurePrefix(parsed)
-  console.log('🔍 after ensurePrefix:', barcode)
   if (!barcode) {
     window.showToast(`Неверный формат: ${input}`)
     isProcessingScan.value = false
@@ -364,8 +358,7 @@ async function startScanner() {
     onScan: async (barcode) => {
       await processScannedCode(barcode)
     },
-    onError: (err) => {
-      console.error('Scanner error:', err)
+    onError: () => {
       isScanning.value = false
     }
   })
@@ -483,14 +476,17 @@ async function refreshPalletItems() {
       window.showToast('Обновлено', 1500)
     }
   } catch (err) {
-    console.error('Ошибка обновления:', err)
     window.showToast('Ошибка обновления', 2000, 'error')
   }
 }
 
 // Удаление товара из паллета
-function removeItem(item) {
-  palletStore.removeItemFromPallet(palletItemsWithDetails.value.findIndex(i => i.number === item.number))
+async function removeItem(item) {
+  await palletStore.removeItemFromPallet(item)
+  // Если удалили микс — обновляем список доступных
+  if (item.source_type === 'box') {
+    await loadAvailableMixes()
+  }
 }
 
 // Проверка владения текущим контейнером
@@ -570,12 +566,30 @@ function handleKeyDown(event) {
         </div>
       </div>
 
-      <!-- Режим сканирования -->
-      <div v-if="!palletStore.currentPallet" class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4">
-        <h3 class="font-semibold text-slate-100 mb-3">Создайте паллет для начала работы</h3>
-        <Button variant="primary" block @click="createAndSelectNewPallet()">
-          🏗️ Создать паллет
-        </Button>
+      <!-- Пустое состояние — нет активного паллета и нет активных паллетов -->
+      <div v-if="!palletStore.currentPallet && activePallets.length === 0" class="absolute inset-0 flex flex-col items-center justify-center">
+        <button
+          @click="createAndSelectNewPallet()"
+          class="w-20 h-20 rounded-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 flex items-center justify-center transition-colors shadow-lg shadow-blue-600/30"
+        >
+          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+        </button>
+        <p class="mt-4 text-slate-400 text-sm">Создайте паллет для начала работы</p>
+      </div>
+
+      <!-- Пустое состояние — нет активного паллета, но есть активные паллеты -->
+      <div v-if="!palletStore.currentPallet && activePallets.length > 0" class="flex flex-col items-center justify-center py-8">
+        <button
+          @click="createAndSelectNewPallet()"
+          class="w-16 h-16 rounded-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 flex items-center justify-center transition-colors shadow-lg shadow-blue-600/30"
+        >
+          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+        </button>
+        <p class="mt-3 text-slate-400 text-sm">Создайте паллет для начала работы</p>
       </div>
 
       <!-- Список активных паллетов -->
@@ -784,10 +798,6 @@ function handleKeyDown(event) {
         </div>
       </div>
 
-      <!-- Подсказка когда нет активного контейнера -->
-      <div v-if="!palletStore.currentPallet" class="text-center py-6">
-        <p class="text-slate-400 text-sm">Создайте паллет или выберите существующий</p>
-      </div>
     </main>
 
     <!-- Модальное окно сканера -->
@@ -855,10 +865,6 @@ function handleKeyDown(event) {
 </template>
 
 <style scoped>
-.custom-btn-primary {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border-color: #2563eb;
-}
 .custom-btn-secondary {
   background: rgba(107, 114, 128, 0.2);
   border-color: rgba(107, 114, 128, 0.3);
@@ -892,10 +898,6 @@ function handleKeyDown(event) {
   50% { opacity: 0.7; }
 }
 
-.item-new-glow {
-  box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
-}
-
 .scrollbar-thin::-webkit-scrollbar {
   width: 4px;
 }
@@ -906,14 +908,6 @@ function handleKeyDown(event) {
 .scrollbar-thin::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 8px;
-}
-
-.status-bar {
-  /* Убран position: sticky чтобы не висел поверх контента при скролле */
-}
-
-.box-actions {
-  /* Убран фон — кнопки без подложки */
 }
 
 .pallet-view {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Сервер Fastify — HTTP API + SSE для realtime push.
  */
 
@@ -7,8 +7,8 @@ import fastifyCors from '@fastify/cors';
 import fastifyJwt from '@fastify/jwt';
 import fastifyWebsocket from '@fastify/websocket';
 import { config } from './config.js';
-import { query } from './db/index.js';
 import { initWebSocket } from './ws/index.js';
+import { pool } from './db/index.js';
 
 
 const app = Fastify({
@@ -16,15 +16,18 @@ const app = Fastify({
 });
 
 // CORS через @fastify/cors — allowlist доверенных origins (не wildcard с credentials!)
+const isDev = process.env.NODE_ENV !== 'production' || process.env.BACKEND_SSL === 'false';
 await app.register(fastifyCors, {
-  origin: [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:5173',
-    'https://monutor.github.io',
-    'https://warehouse-brain-backend.onrender.com',
-    ...((process.env.CORS_ALLOWED_ORIGINS || '').split(',').filter(Boolean)),
-  ],
+  origin: isDev
+    ? true // В dev-режиме разрешаем все origins (localhost, IP, телефон, ТСД)
+    : [
+        'http://localhost:3000',
+        'http://127.0.0.1:3000',
+        'http://localhost:5173',
+        'https://monutor.github.io',
+        'https://warehouse-brain-backend.onrender.com',
+        ...((process.env.CORS_ALLOWED_ORIGINS || '').split(',').filter(Boolean)),
+      ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -39,17 +42,10 @@ await app.register(fastifyJwt, {
 // WebSocket ДО роутов
 await app.register(fastifyWebsocket);
 
-app.decorate('authenticate', async (request, reply) => {
-  try { await request.jwtVerify() }
-  catch { return reply.unauthorized('Unauthorized', { code: 'unauthorized' }) }
-});
-
-// SSE endpoint — прямо на app ПЕРЕД registerRoutes
-import { getSSE, updateMaintenance, broadcastSSE } from './routes/maintenance.js';
+// SSE endpoint — maintenance mode + sync
+import { getSSE, updateMaintenance } from './routes/maintenance.js';
 app.get('/api/maintenance', getSSE);
 app.put('/api/maintenance', updateMaintenance);
-
-// SSE для maintenance mode (отдельный endpoint)
 app.get('/api/sync', getSSE);
 
 // API остальные роуты
@@ -62,8 +58,25 @@ initWebSocket(app);
 // -�����?�� ??��???��
 try {
   await app.listen({ host: config.server.host, port: config.server.port });
-  console.log(`🚀 Backend: http://${config.server.host}:${config.server.port}`);
+  app.log.info(`🚀 Backend: http://${config.server.host}:${config.server.port}`);
 } catch (err) {
-  console.error('Failed to start server:', err);
+  app.log.error('Failed to start server: ' + err.message);
   process.exit(1);
 }
+
+// Graceful shutdown — закрываем DB pool и Fastify при SIGTERM/SIGINT
+async function gracefulShutdown(signal) {
+  app.log.info(`\n📡 ${signal} received — shutting down gracefully...`);
+  try {
+    await app.close();
+    await pool.end();
+    app.log.info('✅ Shutdown complete');
+    process.exit(0);
+  } catch (err) {
+    app.log.error('❌ Error during shutdown: ' + err.message);
+    process.exit(1);
+  }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

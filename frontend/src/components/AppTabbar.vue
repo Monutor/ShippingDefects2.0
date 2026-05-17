@@ -9,10 +9,9 @@ const activeTab = computed(() => {
   const routeMap = {
     '/': 0,
     '/upload': 1,
-    '/scan': 2,
-    '/boxes': 3,
-    '/separate': 4,
-    '/user': 5
+    '/boxes': 2,
+    '/separate': 3,
+    '/user': 4
   }
   return routeMap[route.path] ?? 0
 })

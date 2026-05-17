@@ -10,7 +10,7 @@ defineEmits(['click-left', 'click-right'])
 </script>
 
 <template>
-  <nav class="nav-bar sticky top-0 z-40 px-2 py-3">
+  <nav class="nav-bar sticky top-0 z-40 px-2 py-3 mb-4">
     <div class="nav-bar-content">
       <!-- Left -->
       <div class="nav-bar-left">

@@ -18,21 +18,25 @@ const SCAN_BATCH_INTERVAL = 30000 // Или каждые 30 секунд
    Mojibake fix — декодирование русских символов из WIN1251 → UTF-8
 ============================================================ */
 
-/** Декодирует mojibake (WIN1251 интерпретация UTF-8) в правильный текст */
+/** Декодирует mojibake (UTF-8 байты, интерпретированные как Windows-1251) в правильный текст */
 function decodeMojibake(text) {
   if (!text || typeof text !== 'string') return text
-  
+
   // Проверяем есть ли mojibake (типичные символы: ╨, ╤, etc.)
   const hasMojibake = /[╨╤]/.test(text)
   if (!hasMojibake) return text
-  
+
   try {
-    // Кодируем строку как Windows-1251 (как она была интерпретирована)
-    const encoder = new TextEncoder('windows-1251')
-    const bytes = encoder.encode(text)
-    
-    // Декодируем обратно как UTF-8
-    const decoder = new TextDecoder('utf-8')
+    // В браузере TextEncoder поддерживает только UTF-8.
+    // Для mojibake recovery: каждый символ mojibake — это байт UTF-8,
+    // интерпретированный через Windows-1251. Конвертируем code points обратно в байты.
+    const bytes = new Uint8Array(text.length)
+    for (let i = 0; i < text.length; i++) {
+      const code = text.charCodeAt(i)
+      // Windows-1251: символы 0x80-0xFF маппятся на те же code points
+      bytes[i] = code > 0xFF ? 0x3F : code // fallback на '?' если超出 диапазона
+    }
+    const decoder = new TextDecoder('utf-8', { fatal: true })
     return decoder.decode(bytes)
   } catch {
     // Если не работает — возвращаем оригинал
@@ -89,19 +93,16 @@ class ScanBatchManager {
 
     try {
       await db.scanHistory.logBatch(this.batch)
-      console.log(`📡 Отправлен пакет сканирований: ${this.batch.length}`)
 
-      // BUG-10 fix: очищаем batch ТОЛЬКО после успешной отправки (было — до отправки в catch, приводило к потере данных)
+      // BUG-10 fix: очищаем batch ТОЛЬКО после успешной отправки
       this.batch = []
-      this.retryCount = 0  // сбрасываем счётчик retry при успехе
+      this.retryCount = 0
       this.saveBatch()
     } catch (error) {
-      console.warn('⚠️ Не удалось отправить пакет сканов:', error.message)
 
-      // BUG-10 fix: backoff retry вместо потери batch. Timer не убиваем — перепланируем с увеличенным интервалом.
+      // BUG-10 fix: backoff retry вместо потери batch
       this.retryCount++
       const delay = Math.min(1000 * Math.pow(2, this.retryCount), this.MAX_RETRY_DELAY)
-      console.log(`🔄 Retry через ${delay}ms (попытка ${this.retryCount})`)
 
       // Не очищаем batch! Оставляем для retry.
       this.timer = setTimeout(() => {
@@ -152,9 +153,7 @@ export async function syncBrainItems(items, columnMapping, uploaderEmployeeId = 
     }))
 
     await db.brainItems.import({ rows })
-    console.log(`✅ База синхронизирована: ${rows.length} товаров`)
   } catch (error) {
-    console.error('Ошибка синхронизации brain items:', error)
   }
 }
 
@@ -173,7 +172,6 @@ export async function loadBrainItemsFromBackend() {
       comment: decodeMojibake(item.comment || '')
     }))
   } catch (error) {
-    console.error('Ошибка загрузки brain items:', error)
     return null
   }
 }
@@ -185,10 +183,8 @@ export async function deleteBrainItemsFromBackend() {
 
   try {
     await db.brainItems.clearAll()
-    console.log('🗑 База brain items удалена с бэкенда')
     return { success: true }
   } catch (error) {
-    console.error('Ошибка удаления brain items:', error)
     throw error
   }
 }
@@ -205,7 +201,6 @@ export function logScan(scanData) {
       collector_id: auth.getUserId()
     })
   } catch (err) {
-    console.error('Ошибка логирования скана:', err)
     if (typeof window.showToast === 'function') {
       window.showToast(`⚠️ Ошибка сохранения скана: ${err.message}`)
     }
@@ -222,7 +217,6 @@ export async function loadSeparateItemsFromBackend() {
     if (result.error) throw new Error(result.error.message)
     return (result.data || [])
   } catch (error) {
-    console.error('Ошибка загрузки separate items:', error)
     return []
   }
 }
@@ -241,10 +235,8 @@ export async function syncSeparateItem(item) {
       defect_type: '',
       comment: item.comment || ''
     })
-    console.log(`✅ Отдельный товар синхронизирован:`, item.number)
     return { success: true }
   } catch (error) {
-    console.error('Ошибка синхронизации separate item:', error)
     return null
   }
 }

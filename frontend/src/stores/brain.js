@@ -36,18 +36,6 @@ export const useBrainStore = defineStore('brain', () => {
   // Вычисляемое: есть ли загруженная база
   const hasDatabase = computed(() => items.value.length > 0)
 
-  // Вычисляемое: статус синхронизации
-  const syncStatus = computed(() => ({
-    isSyncing: isSyncing.value,
-    error: syncError.value
-  }))
-
-  // Вычисляемое: статус загрузки
-  const loadStatus = computed(() => ({
-    isLoading: isLoading.value,
-    error: loadError.value
-  }))
-
   /**
    * Загрузка данных из распарсенного Excel
    */
@@ -119,40 +107,6 @@ export const useBrainStore = defineStore('brain', () => {
     }
   }
 
-  async function refreshFromBackend() {
-    isLoading.value = true
-    loadError.value = null
-    try {
-      const data = await loadBrainItemsFromBackend()
-
-      if (data && data.length > 0) {
-        items.value = data.map((item, index) => ({
-          id: index,
-          number: item.number,
-          name: item.name,
-          article: item.article || '',
-          comment: item.comment || ''
-        }))
-        columnMapping.value = {
-          number: 'number',
-          name: 'name',
-          article: 'article',
-          comment: 'comment'
-        }
-      } else {
-        items.value = []
-        columnMapping.value = { number: null, name: null, article: null, comment: null }
-      }
-
-      return { success: true, itemCount: data?.length || 0 }
-    } catch (error) {
-      loadError.value = 'Не удалось обновить с сервера.'
-      return { success: false, error: error.message }
-    } finally {
-      isLoading.value = false
-    }
-  }
-
   /**
    * Поиск товара по номеру этикетки брака
    */
@@ -167,8 +121,10 @@ export const useBrainStore = defineStore('brain', () => {
     
     // Fallback: если не нашли по number — ищем по article (коду товара)
     if (!foundItem && barcode.trim()) {
-      const normalizedArticle = parseBarcodeToBrainNumber(item.article) || item.article
-      foundItem = items.value.find(item => normalizedArticle && normalizedArticle === parsedBarcode) || null
+      foundItem = items.value.find(item => {
+        const normalizedArticle = parseBarcodeToBrainNumber(item.article) || item.article
+        return normalizedArticle && normalizedArticle === parsedBarcode
+      }) || null
     }
     
     return foundItem
@@ -219,13 +175,10 @@ export const useBrainStore = defineStore('brain', () => {
     hasDatabase,
     isSyncing,
     syncError,
-    syncStatus,
     isLoading,
     loadError,
-    loadStatus,
     setDatabase,
     loadFromBackend,
-    refreshFromBackend,
     findByBarcode,
     clearDatabase,
     isStopItem

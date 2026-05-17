@@ -9,12 +9,13 @@ dotenv.config();
 async function seed() {
   console.log('🌱 Running seed...');
 
-  // Админ профиль (employeeId: admin)
+  // Админ профиль — employee_id из env или 'admin' по умолчанию
+  const adminEmployeeId = process.env.ADMIN_EMPLOYEE_ID || 'admin';
   await singleQuery(
     `INSERT INTO collector_profiles (employee_id, full_name, position, is_admin)
      VALUES ($1, $2, $3, true)
      ON CONFLICT (employee_id) DO NOTHING`,
-    ['admin', 'Администратор', 'Склад']
+    [adminEmployeeId, 'Администратор', 'Склад']
   );
 
   // Начальная настройка: maintenance_mode = false

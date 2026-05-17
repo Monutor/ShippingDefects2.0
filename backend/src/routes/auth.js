@@ -84,7 +84,6 @@ export default async function authRoutes(app) {
 
     // Step 2: регистрация нового профиля
     if (!fullName || !position) {
-      recordLoginAttempt(employeeId, false)
       return reply.code(400).send({ error: 'Для регистрации нужны fullName и position' });
     }
 

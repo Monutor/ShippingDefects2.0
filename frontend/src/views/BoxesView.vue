@@ -83,13 +83,11 @@ watch(viewedBoxId, async (boxId) => {
   const fromBoxes = boxesStore.boxes.find(b => b.id === boxId && b.itemsLoaded)
   const fromAvailable = palletStore.availableBoxes?.find(b => b.id === boxId && b.itemsLoaded)
   if (fromBoxes || fromAvailable) {
-    console.log('✅ Guard: короб уже загружен, пропускаем', boxId)
     return
   }
 
   // Guard: не грузить если этот короб уже в процессе загрузки
   if (_viewedBoxLoadedId.value === boxId) {
-    console.warn('⏸️ loadViewedBox skipped — already loading:', boxId)
     return
   }
 
@@ -101,7 +99,6 @@ watch(viewedBoxId, async (boxId) => {
   if (gen !== _lastLoadGen) return  // gen изменился — есть новый запрос, отменяем
   
   if (result?.error || !result?.data) {
-    console.warn('⚠️ Не удалось загрузить короб:', boxId)
     viewedBox.value = null
     viewedBoxItems.value = []
     return
@@ -112,7 +109,6 @@ watch(viewedBoxId, async (boxId) => {
   if (gen !== _lastLoadGen) return
   
   if (!foundBox) {
-    console.warn('⚠️ Короб не найден:', boxId)
     viewedBox.value = null
     viewedBoxItems.value = []
     return
@@ -133,8 +129,6 @@ watch(viewedBoxId, async (boxId) => {
 
   // Помечаем что этот короб загружен — следующий watch пропустит его
   _viewedBoxLoadedId.value = boxId
-
-  console.log(`📦 Загружен короб: ${viewedBox.value?.name}, товаров: ${viewedBoxItems.value.length}`)
 })
 
 async function loadPalletsForTab() {
@@ -144,7 +138,6 @@ async function loadPalletsForTab() {
     let activePallet = null
     if (navigator.onLine) {
       activePallet = await palletStore.loadActivePallet()
-      console.log(`📦 BoxesView: activePallet=${activePallet?.name || 'null'}, items=${activePallet?.items?.length ?? 'N/A'}`)
       
       // Если currentPallet есть но items пустой — загрузить с сервера принудительно
       if (palletStore.currentPallet && (!palletStore.currentPallet.items || palletStore.currentPallet.items.length === 0)) {
@@ -155,7 +148,6 @@ async function loadPalletsForTab() {
             source_id: i.source_id,
           }))
           palletStore.currentPallet = { ...palletStore.currentPallet, items }
-          console.log(`🔄 BoxesView: загружены товары для currentPallet: ${items.length}`)
         }
       }
     }
@@ -170,14 +162,11 @@ async function loadPalletsForTab() {
     if (palletStore.pallets && palletStore.pallets.length > 0) {
       pallets.value = palletStore.pallets.map(p => ({ ...p, seal: p.seal || null }))
     } else {
-      console.warn('🔍 loadPalletsForTab: no data from pallet store')
       pallets.value = []
     }
 
     availableBoxes.value = palletStore.availableBoxes || []
-    console.log('🔍 loadPalletsForTab: паллетов:', pallets.value.length, 'коробов для паллета:', availableBoxes.value.length)
   } catch (error) {
-    console.error('❌ Ошибка загрузки паллетов для таба:', error)
     pallets.value = []
     availableBoxes.value = []
   } finally {
@@ -202,15 +191,12 @@ const boxFinishedHandler = async (msg) => {
   const boxId = msg.box_id
   if (!boxId) return
   
-  console.log('📦 BoxesView: короб завершён на другом устройстве', boxId)
-  
   // Перезагружаем все короба чтобы получить актуальный статус
   await boxesStore.loadBoxes()
 }
 
 // Загружаем паллеты при монтировании компонента, а не только при переключении таба
 onMounted(() => {
-  console.log('🔍 BoxesView onMounted: activeTab =', activeTab.value)
   if (navigator.onLine) loadPalletsForTab()
 
   ws.on('boxes_cleared', boxesClearedHandler)
@@ -235,8 +221,6 @@ const containerItemAddedHandler = async (msg) => {
   const matchesActiveBox = boxesStore.currentBox?.id && receivedId === boxesStore.currentBox.id
 
   if (!matchesViewedBox && !matchesActiveBox) return
-
-  console.log('🔄 BoxesView realtime update: товар добавлен в контейнер', receivedId)
 
   // Обновляем просмотренный items
   if (matchesViewedBox) {
@@ -265,9 +249,7 @@ const containerItemAddedHandler = async (msg) => {
 
 const palletsReverse = computed(() => [...pallets.value].reverse())
 const palletCount = computed(() => {
-  const count = pallets.value.length
-  console.log('🔍 palletCount computed:', count)
-  return count
+  return pallets.value.length
 })
 
 // Заголовы табов (обновляются реактивно через boxesStore и pallets) — порядок: Миксы, Паллеты, Текущий
@@ -351,7 +333,6 @@ async function finishCurrentPalletFromBoxes() {
       window.showToast('Ошибка завершения паллета')
     }
   } catch (err) {
-    console.error('Ошибка завершения паллета:', err)
     window.showToast('Ошибка: ' + err.message)
   }
 }
@@ -465,6 +446,8 @@ async function confirmDelete() {
   selectedBoxForDelete.value = null
 }
 
+const showClearModal = ref(false)
+
 function clearAll() {
   // BUG-21 fix: используем централизованную isAdmin из @/config вместо дублирования логики
   if (!isAdmin()) {
@@ -475,13 +458,9 @@ function clearAll() {
   showClearModal.value = true
 }
 
-const showClearModal = ref(false)
-
 // P2 fix: старый watcher для tab 0 удалён — объединён в один выше
 
 async function confirmClear() {
-  console.log('🔍 До очистки:', boxesStore.boxes.length, 'коробов,', pallets.value.length, 'паллетов')
-
   // Сначала очищаем на сервере — ждём ответ и WS broadcast
   const boxResult = await boxesStore.clearAllBoxes()
 
@@ -493,8 +472,6 @@ async function confirmClear() {
 
   // Затем очищаем паллеты на сервере
   const palletResult = await palletStore.clearAllPallets()
-
-  console.log('🔍 confirmClear: boxResult=', boxResult, 'palletResult=', palletResult)
 
   // Очищаем локальные массивы ТОЛЬКО после успешного ответа от сервера
   boxesStore.boxes = []
@@ -530,8 +507,6 @@ function formatDate(dateString) {
       left-text="Назад"
       left-arrow
       @click-left="$router.back()"
-      right-text="Очистить"
-      @click-right="clearAll"
     />
 
     <!-- Tabs -->
@@ -599,7 +574,7 @@ function formatDate(dateString) {
             </div>
             <h3 class="text-lg font-semibold text-slate-100 mb-2">Пока нет миксов</h3>
             <p class="text-slate-400 text-sm mb-6">Начните сканирование для создания первого короба</p>
-            <Button @click="$router.push('/scan')">Начать сканирование</Button>
+            <Button @click="$router.push('/mix-view')">Начать сканирование</Button>
           </div>
 
           <div v-else class="boxes-list py-4">
@@ -666,7 +641,7 @@ function formatDate(dateString) {
                   </div>
                 </div>
               </div>
-              <Button block class="mt-3 custom-btn-primary" @click="$router.push('/scan')">
+              <Button block class="mt-3 custom-btn-primary" @click="$router.push('/pallet-view')">
                 <van-icon name="add-o" class="mr-2" /> Создать паллет ({{ availableBoxes.length }} коробов доступно)
               </Button>
             </div>

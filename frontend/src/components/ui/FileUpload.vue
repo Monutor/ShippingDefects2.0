@@ -11,17 +11,12 @@ const emit = defineEmits(['change'])
 const fileInput = ref(null)
 
 function handleClick() {
-  console.log('[FileUpload] Клик по зоне загрузки')
   fileInput.value?.click()
 }
 
 function handleChange(e) {
-  console.log('[FileUpload] Событие change', e)
   const file = e.target?.files?.[0]
-  console.log('[FileUpload] Выбранный файл:', file)
-  console.log('[FileUpload] Эмит события change с файлом')
   emit('change', file)
-  console.log('[FileUpload] Событие эмитнуто')
 }
 </script>
 

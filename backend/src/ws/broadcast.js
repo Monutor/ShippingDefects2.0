@@ -29,13 +29,22 @@ export function removeClient(ws) {
 export function broadcast(message, excludeWs = null) {
   const payload = JSON.stringify(message);
   // WebSocket.OPEN === 1 (numeric constant), не зависим от глобального WebSocket
+  const deadSockets = [];
   for (const [ws] of clients) {
-    if (ws === excludeWs || ws.readyState !== 1) continue;
+    if (ws === excludeWs) continue;
+    if (ws.readyState !== 1) {
+      deadSockets.push(ws);
+      continue;
+    }
     try {
       ws.send(payload);
     } catch (_) {
-      // отключившийся сокет — игнорируем
+      deadSockets.push(ws);
     }
+  }
+  // Удаляем мёртвые сокеты из Map — предотвращаем memory leak
+  for (const ws of deadSockets) {
+    removeClient(ws);
   }
 }
 

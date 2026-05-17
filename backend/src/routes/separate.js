@@ -48,7 +48,49 @@ export default async function separateRoutes(app) {
   });
 
   /**
-   * DELETE /api/separate/:id — удалить отдельный item
+   * DELETE /api/separate — удалить item по barcode (query) или очистить все (admin)
+   */
+  app.delete('/', async (request, reply) => {
+    const { barcode } = request.query || {}
+    
+    // Если передан barcode — удаляем конкретный item
+    if (barcode) {
+      const is_admin = request.user?.is_admin || false
+      let deleteResult
+      if (is_admin) {
+        deleteResult = await queryRaw('DELETE FROM separate_items WHERE barcode = $1', [barcode])
+      } else {
+        deleteResult = await queryRaw(
+          `DELETE FROM separate_items si USING boxes b
+           WHERE si.barcode = $1 AND si.container_id::text = b.id::text AND si.container_type = 'box' AND b.collector_id = $2`,
+          [barcode, request.user.employeeId]
+        )
+        if (!deleteResult?.rowCount) {
+          deleteResult = await queryRaw(
+            `DELETE FROM separate_items si USING pallets p
+             WHERE si.barcode = $1 AND si.container_id::text = p.id::text AND si.container_type = 'pallet' AND p.collector_id = $2`,
+            [barcode, request.user.employeeId]
+          )
+        }
+        if (!deleteResult?.rowCount) {
+          return reply.code(403).send({ error: 'У вас нет прав на удаление этого товара' })
+        }
+      }
+      if (!deleteResult.rowCount) {
+        return reply.code(404).send({ error: 'Товар не найден' })
+      }
+      return reply.send({ success: true, deletedByBarcode: barcode })
+    }
+    
+    // Без barcode — очистка всех (admin only)
+    const is_admin = request.user?.is_admin || false
+    if (!is_admin) return reply.code(403).send({ error: 'Только админ' })
+    await query('DELETE FROM separate_items')
+    return reply.send({ success: true, deletedItems: 'all_separate' })
+  })
+
+  /**
+   * DELETE /api/separate/:id — удалить отдельный item по ID (legacy)
    */
   app.delete('/:id', async (request, reply) => {
     const param = request.params.id;
@@ -72,6 +114,8 @@ export default async function separateRoutes(app) {
       if (result.rowCount > 0) {
         return reply.send({ success: true, deletedId: id });
       }
+      // Integer ID не найден — не фоллбэчим на barcode, возвращаем 404
+      return reply.code(404).send({ error: 'Item не найден по ID' });
     }
 
     // Fallback: удаление по barcode — только владелец контейнера или admin
@@ -107,17 +151,6 @@ export default async function separateRoutes(app) {
     }
 
     return reply.send({ success: true, deletedByBarcode: param });
-  });
-
-  /**
-   * DELETE /api/separate — очистить все (admin only)
-   */
-  app.delete('/', async (request, reply) => {
-    const is_admin = request.user?.is_admin || false;
-    if (!is_admin) return reply.code(403).send({ error: 'Только админ' });
-
-    await query('DELETE FROM separate_items');
-    return reply.send({ success: true, deletedItems: 'all_separate' });
   });
 
   /**

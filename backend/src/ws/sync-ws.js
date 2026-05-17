@@ -22,9 +22,9 @@ export function initWebSocket(app) {
           let decoded
           try {
             decoded = await app.jwt.verify(token)
-            console.log('✅ JWT verified for', decoded.employeeId)
+            app.log.info('JWT verified for ' + decoded.employeeId)
           } catch (err) {
-            console.warn(`❌ JWT verify failed: ${err.message}`)
+            app.log.warn(`JWT verify failed: ${err.message}`)
             socket.send(JSON.stringify({ type: 'auth_result', success: false, message: 'Invalid token' }))
             socket.close(4003, 'Invalid token')
             return
@@ -34,7 +34,7 @@ export function initWebSocket(app) {
           clientId = addClient(socket, { connectedAt: new Date(), employeeId: decoded.employeeId })
 
           socket.send(JSON.stringify({ type: 'auth_result', success: true, clientId }))
-          console.log(`🔌 WebSocket client #${clientId} connected (${getClientCount()} total)`)
+          app.log.info(`WebSocket client #${clientId} connected (${getClientCount()} total)`)
 
           return  // Ждём init_request от клиента
         }
@@ -62,13 +62,13 @@ export function initWebSocket(app) {
             socket.send(JSON.stringify({ type: 'pong' }))
             break
           case 'subscribe':
-            console.log(`Client #${clientId} subscribing to box ${msg.boxId}`)
+            app.log.debug(`Client #${clientId} subscribing to box ${msg.boxId}`)
             socket.__subscribedBoxes = socket.__subscribedBoxes || new Set()
             if (msg.boxId) socket.__subscribedBoxes.add(msg.boxId)
             break
         }
       } catch (err) {
-        console.warn('WS message parse error:', err.message)
+        app.log.warn('WS message parse error: ' + err.message)
       }
     })
 
@@ -84,11 +84,12 @@ export function initWebSocket(app) {
       clearTimeout(authTimeout)
       removeClient(socket)
       if (socket.__subscribedBoxes) socket.__subscribedBoxes.clear()
-      console.log(`🔌 WebSocket client #${clientId} disconnected (${getClientCount()} total)`)
+      app.log.info(`WebSocket client #${clientId} disconnected (${getClientCount()} total)`)
     })
 
     socket.on('error', (err) => {
-      console.error('WS error:', err.message)
+      clearTimeout(authTimeout)
+      app.log.error('WS error: ' + err.message)
     })
   })
 }

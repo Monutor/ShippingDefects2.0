@@ -17,7 +17,6 @@ const tabTitles = ref([])
 
 /** Вызывается каждым Tab при монтировании */
 function registerTab(index, initialTitle) {
-  console.log('🔍 Tabs registerTab:', index, initialTitle)
   const titleRef = ref(typeof initialTitle === 'function' ? initialTitle() : String(initialTitle))
   
   if (index >= tabTitles.value.length) {
@@ -31,11 +30,8 @@ function registerTab(index, initialTitle) {
     tabTitles.value = updated
   }
   
-  console.log('🔍 Tabs tabTitles now:', tabTitles.value.length)
-  
   return {
     set(title) {
-      console.log('🔍 Tabs set title:', index, title)
       titleRef.value = typeof title === 'function' ? title() : String(title)
     }
   }

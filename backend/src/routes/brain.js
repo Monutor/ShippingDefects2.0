@@ -1,5 +1,4 @@
 import { query, pool } from '../db/index.js';
-import ExcelJS from 'exceljs';
 
 /**
  * GET /api/brain — получить все элементы БД брака
@@ -95,8 +94,8 @@ export default async function brainRoutes(app) {
       return reply.send({ success: true, imported: inserted });
     } catch (err) {
       await client.query('ROLLBACK');
-      console.error('❌ Ошибка импорта brain_items (откат):', err.message);
-      return reply.code(500).send({ error: `Импорт failed: ${err.message}` });
+      app.log.error('Ошибка импорта brain_items (откат): ' + err.message);
+      return reply.code(500).send({ error: 'Ошибка импорта данных. Попробуйте позже.' });
     } finally {
       client.release();
     }

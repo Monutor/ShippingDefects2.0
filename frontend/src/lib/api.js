@@ -17,8 +17,6 @@ function getToken() {
     const user = JSON.parse(userStr)
     return user.token || null
   } catch (e) {
-    // L2 fix: повреждённый JSON — предупреждаем и очищаем сессию
-    console.warn('⚠️ warehouse-brain-user: повреждённый JSON, очищаю сессию', e.message)
     try { localStorage.removeItem('warehouse-brain-user') } catch {}
     return null
   }
@@ -46,7 +44,10 @@ async function request(url, options = {}) {
     headers: { ...authHeaders(), ...(options.headers || {}) },
   })
 
-  const data = await res.json().catch(() => null)
+  // Читаем body один раз — затем пробуем распарсить как JSON
+  const rawText = await res.text()
+  let data = null
+  try { data = JSON.parse(rawText) } catch {}
 
   if (!res.ok) {
     // Если 401 — токен истёк или невалидный: очищаем сессию и перенаправляем на login
@@ -56,9 +57,9 @@ async function request(url, options = {}) {
       if (userStr) {
         try {
           const user = JSON.parse(userStr)
-          // Проверяем, не истёк ли токен (JWT expires in: 7d)
-          if (user.authenticatedAt && user.token) {
-            const expiredAt = new Date(user.authenticatedAt).getTime() + 7 * 24 * 60 * 60 * 1000
+            // Проверяем, не истёк ли токен (JWT expires in: 1d)
+            if (user.authenticatedAt && user.token) {
+              const expiredAt = new Date(user.authenticatedAt).getTime() + 1 * 24 * 60 * 60 * 1000
             tokenExpired = Date.now() > expiredAt
           } else {
             // Нет authenticatedAt или token — данные повреждены, очищаем
@@ -75,17 +76,17 @@ async function request(url, options = {}) {
       if (tokenExpired && !window._isNavigatingToLogin) {
         window._isNavigatingToLogin = true  // P1 fix: мьютекс для навигации на login
         try {
-          // FIX: useRouter() нельзя вызывать вне контекста компонента — используем window.location.href
-          // Динамический import + router.push как fallback (работает только из <script setup>)
           const module = await import('vue-router')
-          // eslint-disable-next-line no-undef
           if (typeof window.$router !== 'undefined' && typeof window.$router.push === 'function') {
             window.$router.push('/login')
           } else {
             window.location.href = '/login'
           }
-
         } catch {}
+        finally {
+          // Сброс мьютекса в любом случае — предотвращаем блокировку будущих 401 редиректов
+          setTimeout(() => { window._isNavigatingToLogin = false }, 5000)
+        }
       } else {
         // P1 fix: сброс мьютекса через 5 секунд после навигации
         setTimeout(() => { window._isNavigatingToLogin = false }, 5000)
@@ -97,7 +98,7 @@ async function request(url, options = {}) {
       }
     }
 
-    const errorText = data ? (data?.error || data?.message || null) : await res.text().catch(() => null)
+    const errorText = data ? (data?.error || data?.message || null) : rawText || null
     return { error: { code: res.status, message: data?.error || data?.message || `HTTP ${res.status}`, detail: data || errorText } }
   }
 
@@ -116,32 +117,11 @@ export const auth = {
     return request('/api/auth/login', { method: 'POST', body: JSON.stringify(body) })
   },
 
-  /** Get current user profile */
-  async getMe() {
-    return request('/api/auth/me')
-  },
-
-  /** Logout — clean local storage token */
-  logout() {
-    try {
-      const userStr = localStorage.getItem('warehouse-brain-user')
-      if (userStr) {
-        const user = JSON.parse(userStr)
-        delete user.token
-        // L4 fix: если token не был установлен или равен null — удаляем весь ключ
-        if (!user.token || user.token === 'null') {
-          localStorage.removeItem('warehouse-brain-user')
-        } else {
-          localStorage.setItem('warehouse-brain-user', JSON.stringify(user))
-        }
-      }
-    } catch {}
-  },
-
   /** Logout — clean local storage token */
   async signOut() {
-    this.logout()
-    localStorage.removeItem('warehouse-brain-user')
+    try {
+      localStorage.removeItem('warehouse-brain-user')
+    } catch {}
   },
 
   /** Check if authenticated */
@@ -157,11 +137,6 @@ export const auth = {
       const user = JSON.parse(userStr)
       return user.employeeId || user.id || null
     } catch { return null }
-  },
-
-  /** Check online status */
-  isOnline() {
-    return navigator.onLine
   },
 }
 
@@ -205,8 +180,9 @@ export const db = {
     async delete(boxId) {
       return request(`/api/boxes/${boxId}`, { method: 'DELETE' })
     },
-    async clearAllFinished() {
-      return request('/api/boxes?status=finished', { method: 'DELETE' })
+    async clearAllFinished({ active = false } = {}) {
+      const qs = active ? '?active=true' : ''
+      return request(`/api/boxes${qs}`, { method: 'DELETE' })
     },
   },
 
@@ -236,14 +212,10 @@ export const db = {
       return request('/api/separate', { method: 'POST', body: JSON.stringify(body) })
     },
     async deleteById(itemId) {
-      return request(`/api/separate/${encodeURIComponent(itemId)}`, { method: 'DELETE' })
+      return request(`/api/separate?barcode=${encodeURIComponent(itemId)}`, { method: 'DELETE' })
     },
     async clearAll() {
       return request('/api/separate', { method: 'DELETE' })
-    },
-    /** Получить separate items для контейнера */
-    async getByContainer(containerId, containerType) {
-      return request(`/api/separate/by-container/${containerId}?type=${containerType}`)
     },
   },
 
@@ -261,10 +233,6 @@ export const db = {
     async logBatch(scans) {
       return request('/api/scan-history/batch', { method: 'POST', body: JSON.stringify({ scans }) })
     },
-    /** Get last scan timestamp for a barcode */
-    async getLastScan(barcode) {
-      return request(`/api/scan-history/last-scan?barcode=${encodeURIComponent(barcode)}`)
-    },
   },
 
   /* ---- Pallets ---- */
@@ -280,13 +248,6 @@ export const db = {
     },
     async delete(palletId) {
       return request(`/api/pallets/${palletId}`, { method: 'DELETE' })
-    },
-    async cancel(palletId) {
-      // BUG-20 fix: Content-Type должен быть application/json т.к. body — JSON.stringify({})
-      return request(`/api/pallets/${palletId}/cancel`, { method: 'PATCH', body: JSON.stringify({}), headers: { 'Content-Type': 'application/json' } })
-    },
-    async clearAllFinished() {
-      return request('/api/pallets', { method: 'DELETE' })
     },
     async clearAll() {
       return request('/api/pallets/all', { method: 'DELETE' })
@@ -352,7 +313,19 @@ export const maintenance = {
    WebSocket — realtime push (boxes_cleared, pallets_cleared)
 ============================================================ */
 
-const WS_URL = `${window.location.protocol === 'https:' ? 'wss://' : 'ws://'}${import.meta.env.VITE_BACKEND_HOST || 'localhost:3001'}/ws/sync`
+// WS URL выводится из VITE_BACKEND_URL — единый источник truth для API и WS
+function buildWsUrl() {
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
+  try {
+    const url = new URL(backendUrl)
+    const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${wsProtocol}//${url.host}/ws/sync`
+  } catch {
+    return `ws://localhost:3001/ws/sync`
+  }
+}
+
+const WS_URL = buildWsUrl()
 let _socket = null
 const _listeners = new Map() // eventName → Set<fn>
 let _wsReconnectCount = 0  // L2 fix: счётчик для экспоненциального backoff
@@ -467,16 +440,6 @@ export const ws = {
     if (!_socket || _socket.readyState !== WebSocket.OPEN) return false
     try { _socket.send(JSON.stringify({ type, ...payload })) } catch {}
     return true
-  },
-
-  /** Статус подключения */
-  isConnected() {
-    return _socket && _socket.readyState === WebSocket.OPEN
-  },
-
-  /** Подписаться на конкретный короб */
-  subscribeBox(boxId) {
-    this.send('subscribe', { boxId })
   },
 }
 

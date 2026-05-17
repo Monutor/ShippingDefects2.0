@@ -34,7 +34,6 @@ async function loadBox(boxId) {
     }
 
     box.value = boxResult.data
-    console.log('📦 Загружен короб:', box.value.name, 'collector:', box.value.collector_id)
 
     // Загружаем товары короба
     const itemsResult = await db.boxItems.getByBoxId(boxId)
@@ -46,10 +45,7 @@ async function loadBox(boxId) {
         comment: i.comment || getItemField(i, 'comment') || null,
       }))
     }
-
-    console.log('📦 Товаров в коробе:', boxItems.value.length)
   } catch (err) {
-    console.error('❌ Ошибка загрузки короба:', err)
     error.value = `Ошибка: ${err.message}`
   } finally {
     isLoading.value = false
@@ -91,7 +87,6 @@ async function exportToExcel() {
       window.showToast('Ошибка экспорта: ' + result.error)
     }
   } catch (err) {
-    console.error('Ошибка экспорта:', err)
     window.showToast('❌ Ошибка экспорта')
   }
 }

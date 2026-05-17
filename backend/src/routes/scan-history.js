@@ -5,6 +5,15 @@ import { query, pool } from '../db/index.js';
  * POST /api/scan-history/batch — пакетная отправка сканов
  */
 export default async function scanHistoryRoutes(app) {
+  // Все эндпоинты scan-history требуют авторизации
+  app.addHook('onRequest', async (request, reply) => {
+    try {
+      await request.jwtVerify();
+    } catch {
+      return reply.code(401).send({ error: 'Unauthorized' });
+    }
+  });
+
   // GET /api/scan-history
   app.get('/', async (request, reply) => {
     const { collector_id, limit = '10', offset = '0' } = request.query;
@@ -36,12 +45,13 @@ export default async function scanHistoryRoutes(app) {
     // Параметры: WHERE params + LIMIT + OFFSET (всегда последние)
     const dataParams = [...params, limitVal, offsetVal];
     // Индекс для LIMIT/OFFSET — всегда после всех WHERE параметров
-    const limitOffsetIndex = paramIndex + params.length;
+    const limitIndex = params.length + 1;
+    const offsetIndex = params.length + 2;
 
     const items = await query(
       `SELECT * FROM scan_history ${whereSQL}
        ORDER BY created_at DESC
-       LIMIT $${limitOffsetIndex} OFFSET $${limitOffsetIndex + 1}`,
+       LIMIT $${limitIndex} OFFSET $${offsetIndex}`,
       dataParams
     );
 
@@ -65,7 +75,7 @@ export default async function scanHistoryRoutes(app) {
       for (const scan of scans) {
         // M5 fix: валидация barcode — не допускаем null/undefined
         if (!scan.barcode || typeof scan.barcode !== 'string') {
-          console.warn('⚠️ Пропускаю скан без barcode:', scan)
+          app.log.warn('Пропускаю скан без barcode: ' + JSON.stringify(scan))
           continue
         }
 

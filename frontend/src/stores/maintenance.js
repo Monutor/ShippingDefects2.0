@@ -13,12 +13,6 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
   const isEnabled = ref(false)
   const isLoading = ref(true)
 
-  // Вычисляемое: статус загрузки
-  const loadStatus = computed(() => ({
-    isLoading: isLoading.value,
-    error: null
-  }))
-
   /** Загрузка состояния из бэкенда */
   async function loadFromBackend() {
     let serverLoaded = false
@@ -36,7 +30,6 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
           serverLoaded = true
         }
       } catch (err) {
-        console.warn('Не удалось загрузить maintenance mode:', err.message)
       }
     }
 
@@ -54,13 +47,9 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
     if (navigator.onLine) {
       try {
         await mApi.save(isEnabled.value)
-        console.log('✅ Maintenance mode сохранён:', isEnabled.value ? 'ВКЛ' : 'ВЫКЛ')
       } catch (err) {
-        // Убрали localStorage fallback — если сервер недоступен, просто логируем
-        console.warn('Не удалось сохранить maintenance mode на бэкенд:', err.message)
       }
     } else {
-      console.warn('Нет подключения: maintenance mode не сохранён')
     }
   }
 
@@ -79,26 +68,19 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
         if (typeof window.__setMaintenanceMode === 'function') {
           window.__setMaintenanceMode(isEnabled.value, false)
         }
-        console.log('📡 SSE init:', isEnabled.value ? 'ВКЛ' : 'ВЫКЛ')
       })
 
       eventSource.addEventListener('maintenance_mode_changed', (e) => {
         const data = JSON.parse(e.data)
         isEnabled.value = data.enabled || false
-        // Убрали localStorage write — только server state
-        // Синхронизируем с router guard
         if (typeof window.__setMaintenanceMode === 'function') {
           window.__setMaintenanceMode(isEnabled.value, false)
         }
-        console.log(`🔄 Maintenance mode обновлён через SSE: ${isEnabled.value ? 'ВКЛ' : 'ВЫКЛ'}`)
       })
 
       eventSource.onerror = () => {
-        console.error('❌ SSE connection error')
-        // EventSource auto-reconnects, no need to handle manually
       }
     } catch (err) {
-      console.error('SSE init failed:', err.message)
     }
   }
 
@@ -107,23 +89,7 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
     if (eventSource) {
       eventSource.close()
       eventSource = null
-      console.log('❌ SSE подписка отключена')
     }
-  }
-
-  /** Очистка при уничтожении стора */
-  function destroy() {
-    unsubscribeFromChanges()
-  }
-
-  async function enableMaintenance() {
-    isEnabled.value = true
-    await saveToBackend()
-  }
-
-  async function disableMaintenance() {
-    isEnabled.value = false
-    await saveToBackend()
   }
 
   async function toggleMaintenance() {
@@ -132,9 +98,7 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
     try {
       await saveToBackend()
     } catch (err) {
-      // Откат на предыдущее значение при ошибке
       isEnabled.value = !isEnabled.value
-      console.error('❌ Не удалось сохранить maintenance mode:', err.message)
     } finally {
       isLoading.value = false
     }
@@ -143,14 +107,10 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
   return {
     isEnabled,
     isLoading,
-    loadStatus,
     loadFromBackend,
     saveToBackend,
     subscribeToChanges,
     unsubscribeFromChanges,
-    enableMaintenance,
-    disableMaintenance,
-    toggleMaintenance,
-    destroy
+    toggleMaintenance
   }
 })

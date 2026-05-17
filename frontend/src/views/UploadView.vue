@@ -430,32 +430,6 @@ function isStopItem(item) {
   background: #475569 !important;
 }
 
-.custom-btn-primary {
-  background: linear-gradient(to right, #3b82f6, #2563eb) !important;
-  border: none !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
-}
-
-.custom-btn-primary:hover {
-  background: linear-gradient(to right, #2563eb, #1d4ed8) !important;
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.5) !important;
-}
-
-/* Кнопка "Удалить" */
-.custom-btn-danger {
-  background: rgba(244, 63, 94, 0.15) !important;
-  border: 1px solid rgba(244, 63, 94, 0.3) !important;
-  color: #fb7185 !important;
-  box-shadow: none !important;
-}
-
-.custom-btn-danger:hover {
-  background: rgba(244, 63, 94, 0.25) !important;
-  border-color: rgba(244, 63, 94, 0.5) !important;
-  color: #fda4af !important;
-}
-
 /* Empty state */
 .empty-state {
   text-align: center;

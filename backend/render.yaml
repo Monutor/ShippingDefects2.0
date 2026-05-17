@@ -17,7 +17,7 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_EXPIRES_IN
-        value: 7d
+        value: 1d
       - key: POSTGRES_HOST
         fromDatabase:
           name: postgres-db

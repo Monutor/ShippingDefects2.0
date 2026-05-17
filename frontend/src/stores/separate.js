@@ -37,12 +37,6 @@ export const useSeparateStore = defineStore('separate', () => {
     return lastAction.type === 'add_item' ? lastAction.item : null
   })
 
-  // Вычисляемое: статус синхронизации
-  const syncStatus = computed(() => ({
-    isSyncing: isSyncing.value,
-    error: syncError.value
-  }))
-
   /* ============================================================
    Загрузка данных с сервера
    ============================================================ */
@@ -157,27 +151,35 @@ export const useSeparateStore = defineStore('separate', () => {
   /** Удаление товара из списка (optimistic + rollback) */
   async function removeItem(index) {
     const itemToRemove = items.value[index]
+    if (!itemToRemove) return false
 
     // M7 fix: если онлайн — удаляем и сразу отправляем на сервер; если офлайн — queue
-    if (navigator.onLine && itemToRemove) {
+    if (navigator.onLine) {
       try {
         const result = await db.separateItems.deleteById(itemToRemove.number)
         if (result.error) throw new Error(result.error.message)
       } catch (err) {
         // BUG-22 fix: rollback — возвращаем товар на место при ошибке сервера
-        items.value.splice(index, 0, itemToRemove)
+        const actualIndex = items.value.findIndex(i => i.number === itemToRemove.number)
+        if (actualIndex !== -1) {
+          items.value.splice(actualIndex, 0, itemToRemove)
+        }
         items.value.forEach((item, idx) => {
           item.placeNumber = idx + 1
         })
         syncError.value = 'Не удалось удалить — данные восстановлены'
         return false
       }
-    } else if (itemToRemove) {
+    } else {
       pendingOfflineDeletes.value.push({ item: JSON.parse(JSON.stringify(itemToRemove)), index })
     }
 
     // BUG-210 fix: splice выполняется после завершения серверной операции
-    items.value.splice(index, 1)
+    // Удаляем по ссылке, а не по индексу — предотвращаем race condition
+    const actualIndex = items.value.findIndex(i => i.number === itemToRemove.number)
+    if (actualIndex !== -1) {
+      items.value.splice(actualIndex, 1)
+    }
     items.value.forEach((item, idx) => {
       item.placeNumber = idx + 1
     })
@@ -278,26 +280,17 @@ export const useSeparateStore = defineStore('separate', () => {
     for (const entry of queued) {
       // BUG-216 fix: TTL для офлайн deletes — удаляем старые записи
       if (entry.timestamp && now - entry.timestamp > TTL) {
-        console.log(`🗑 flushPendingOfflineDeletes: запись ${entry.item.number} старше 24ч, пропускаем`)
         continue
       }
       try {
         await db.separateItems.deleteById(entry.item.id || entry.item.number)
       } catch (err) {
-        // Если товар уже удалён на сервере — ок, пропускаем
         if (err?.code === '404' || err?.statusCode === 404) {
-          console.log('🔄 flushPendingOfflineDeletes: товар уже удалён на сервере')
         } else {
-          pendingOfflineDeletes.value.unshift(entry) // возвращаем в очередь
-          console.warn(`⚠️ Не удалось удалить товар ${entry.item.number} офлайн:`, err.message)
+          pendingOfflineDeletes.value.unshift(entry)
         }
       }
     }
-  }
-
-  /** Очистить только локально */
-  function clearLocal() {
-    items.value = []
   }
 
   return {
@@ -308,13 +301,11 @@ export const useSeparateStore = defineStore('separate', () => {
     lastScannedItem,
     isSyncing,
     syncError,
-    syncStatus,
     addItem,
     removeItem,
     undoLastAction,
     isDuplicate,
     clearAll,
-    clearLocal,
     loadSeparateItems,
     flushPendingOfflineDeletes  // BUG-6 fix: export для main.js online handler
   }

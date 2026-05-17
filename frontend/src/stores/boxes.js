@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref, computed, triggerRef } from 'vue'
+import { ref, computed } from 'vue'
 import { parseBarcodeToBrainNumber } from '@/utils/barcode'
 import { auth, db } from '@/lib/api.js'
 import { isAdmin } from '@/config'
-import { scanBatchManager, logScan } from '@/utils/sync'
+import { logScan } from '@/utils/sync'
+import { useCollectorStore } from '@/stores/collector'
 
 /**
  * Store для управления коробами с товарами (server-first).
@@ -15,23 +16,6 @@ export const useBoxesStore = defineStore('boxes', () => {
 
   // Текущий активный короб (в процессе сборки)
   const currentBox = ref(null)
-
-  /** Валидация currentBox — если не найден на сервере → очищает */
-  async function validateCurrentBox() {
-    if (!currentBox.value || !navigator.onLine) return true
-    try {
-      const result = await db.boxes.getAll()
-      if (result?.data) {
-        const exists = result.data.some(b => b.id === currentBox.value.id && b.collector_id === collectorStore.employeeId)
-        if (!exists) {
-          console.log('🗑️ Stale currentBox валидация не прошла, очищен')
-          currentBox.value = null
-          return false
-        }
-      }
-    } catch {}
-    return true
-  }
 
   // История действий для undo (максимум 50 действий)
   const actionHistory = ref([])
@@ -52,10 +36,9 @@ export const useBoxesStore = defineStore('boxes', () => {
     const MAX_OFFLINE_AGE_MS = 24 * 60 * 60 * 1000 // 24 часа
     const now = Date.now()
     pendingOfflineBoxItems.value = pendingOfflineBoxItems.value.filter(entry => {
-      if (entry.timestamp && (now - entry.timestamp) > MAX_OFFLINE_AGE_MS) {
-        console.warn(`🗑️ TTL: офлайн запись удалена (${Math.round((now - entry.timestamp) / 3600000)}ч назад)`)
-        return false
-      }
+        if (entry.timestamp && (now - entry.timestamp) > MAX_OFFLINE_AGE_MS) {
+          return false
+        }
       return true
     })
 
@@ -76,11 +59,9 @@ export const useBoxesStore = defineStore('boxes', () => {
       } catch (err) {
         // P1 fix: при дубликате НЕ возвращаем в очередь — товар реально уже в коробе. Без этого бесконечный цикл retry.
         if (err?.code === '23505' || /duplicate/i.test(err?.message)) {
-          console.log('🔄 flushPendingOfflineBoxItems: товар уже в коробе на сервере, пропускаем')
           // НЕ возвращаем в очередь — товар реально дубликат
         } else if (pendingOfflineBoxItems.value.length > 0) {
-          pendingOfflineBoxItems.value.unshift(entry) // возвращаем в начало очереди
-          console.warn(`⚠️ Не удалось синхронизировать товар ${entry.item.number} в короб ${entry.boxId}:`, err.message)
+          pendingOfflineBoxItems.value.unshift(entry)
         }
       }
     }
@@ -106,7 +87,7 @@ export const useBoxesStore = defineStore('boxes', () => {
 
   // Вычисляемое: товары текущего короба в обратном порядке (новые сверху)
   const currentBoxItemsReverse = computed(() => {
-    if (!currentBox.value || !currentBox.value.items.length) return []
+    if (!currentBox.value || !currentBox.value.items || !currentBox.value.items.length) return []
     return [...currentBox.value.items].reverse()
   })
 
@@ -136,13 +117,11 @@ export const useBoxesStore = defineStore('boxes', () => {
       const collectorStore = useCollectorStore()
       // BUG-229 fix: проверяем что collectorStore инициализирован
       if (!collectorStore.employeeId) {
-        console.log('⚠️ loadActiveBox: collectorStore не инициализирован')
         return null
       }
       const myBox = activeBoxes.find(b => b.collector_id === collectorStore.employeeId) || null
 
       if (!myBox) {
-        console.log('⚠️ loadActiveBox: нет своих активных коробов для employeeId', collectorStore.employeeId)
         return null
       }
 
@@ -171,11 +150,13 @@ export const useBoxesStore = defineStore('boxes', () => {
     try {
       if (!navigator.onLine) return []
 
+      const collectorStore = useCollectorStore()
+      if (!collectorStore.employeeId) return []
+
       const result = await db.boxes.getAll()
 
       // Если ошибка или нет данных → currentBox НЕ может быть валидным → очищаем
       if (result.error || !result?.data || !Array.isArray(result.data)) {
-        console.log('🗑️ Ошибка/нет данных с сервера, currentBox ВСЕГДА очищен')
         currentBox.value = null
         return []
       }
@@ -186,17 +167,14 @@ export const useBoxesStore = defineStore('boxes', () => {
       if (activeBoxes.length === 0) {
         // BUG-235 fix: не очищаем currentBox если он создан локально и ещё не синхронизирован
         if (currentBox.value && currentBox.value.backendId) {
-          console.log('⚠️ currentBox существует локально, не очищаем')
           return [currentBox.value]
         }
-        console.log('🗑️ Нет активных коробов на сервере, currentBox очищен')
         currentBox.value = null
         return []
       }
 
-      // Очищаем stale currentBox если он не найден среди активных
+      // Очищаем currentBox если он больше не active на сервере (например, завершён)
       if (currentBox.value && !activeBoxes.some(b => b.id === currentBox.value.id)) {
-        console.log('🗑️ Stale currentBox удалён из Pinia')
         currentBox.value = null
       }
 
@@ -210,10 +188,9 @@ export const useBoxesStore = defineStore('boxes', () => {
           comment: item.comment || '',
           scannedAt: item.created_at
         }))
-        return { ...box, items, createdAt: box.created_at }
+        return { ...box, items, createdAt: box.created_at, backendId: box.id }
       }))
 
-      console.log('📦 loadAllActiveBoxes:', boxesWithItems.length, 'коробов')
       return boxesWithItems
     } catch {
       return []
@@ -341,15 +318,11 @@ export const useBoxesStore = defineStore('boxes', () => {
 
   /** Добавление товара в текущий короб */
   async function addItemToCurrentBox(item) {
-    console.log('🔍 addItemToCurrentBox called:', item, 'currentBox:', currentBox.value?.id)
     if (!currentBox.value) {
-      console.error('❌ addItemToCurrentBox: no currentBox!')
       return { success: false, error: 'Нет активного короба' }
     }
 
-    // M1 fix: используем parseBarcode для consistency с checkGlobalDuplicate
     const parsedItemNumber = parseBarcodeToBrainNumber(item.number)
-    console.log('🔍 addItemToCurrentBox: item.number=', item.number, 'parsed=', parsedItemNumber)
     
     // Глобальная проверка дубликатов
     const globalDup = checkGlobalDuplicate(item.number)
@@ -408,21 +381,20 @@ export const useBoxesStore = defineStore('boxes', () => {
         })
 
         if (result.error) {
-          // Проверяем на дубликат — FIX: используем pop() вместо splice(pushIndex, 1)
-          // чтобы не удалить чужой элемент при WebSocket обновлениях от других клиентов
-          if (/duplicate/i.test(result.error.message || '') || result.error.code === 409) {
-            currentBox.value.items.pop()
-            actionHistory.value.pop()
+          // Удаляем добавленный item по номеру, а не pop() — предотвращаем удаление чужого элемента
+          const itemIdx = currentBox.value.items.findIndex(i => i.number === item.number)
+          if (itemIdx !== -1) currentBox.value.items.splice(itemIdx, 1)
+          const histIdx = actionHistory.value.findIndex(a => a.type === 'add_item' && a.item.number === item.number)
+          if (histIdx !== -1) actionHistory.value.splice(histIdx, 1)
 
+          // Проверяем на дубликат
+          if (/duplicate/i.test(result.error.message || '') || result.error.code === 409) {
             // F2 fix: показываем конкретный номер короба где уже лежит товар (из 409 response)
             const boxNumber = result.error.detail?.box_number || result.error.box_number || 'неизвестен'
             window.showToast(`⚠️ Товар уже в коробе №${boxNumber}`, 5000, 'error')
 
             return { success: false, error: 'duplicate_server', boxNumber }
           }
-          // FIX: pop() вместо splice(pushIndex, 1) — безопасно при WS обновлениях от других клиентов
-          currentBox.value.items.pop()
-          actionHistory.value.pop()
           syncError.value = `Не синхронизировано: ${result.error.message}`
           window.showToast(`⚠️ Не удалось сохранить товар: ${result.error.message}`)
           return { success: false }
@@ -499,16 +471,18 @@ export const useBoxesStore = defineStore('boxes', () => {
     const originalCurrentBox = JSON.parse(JSON.stringify(currentBox.value))
 
     try {
-      // Сначала завершаем короб на сервере (PUT status=finished) — C3: используем backendId вместо id
-      if (navigator.onLine && currentBox.value.backendId) {
-        const updateResult = await db.boxes.update(currentBox.value.backendId, { status: 'finished' })
+      const backendId = originalCurrentBox.backendId
+      
+      // Сначала завершаем короб на сервере (PUT status=finished)
+      if (navigator.onLine && backendId) {
+        const updateResult = await db.boxes.update(backendId, { status: 'finished' })
 
         if (updateResult.error) throw new Error(updateResult.error.message)
 
-        // Получаем items от сервера для экспорта — C4: сохраняем оригинал перед merge
+        // Получаем items от сервера для экспорта
         const originalItemsSnapshot = JSON.parse(JSON.stringify(originalCurrentBox.items))
         
-        const itemsResult = await db.boxItems.getByBoxId(currentBox.value.backendId)
+        const itemsResult = await db.boxItems.getByBoxId(backendId)
 
         const serverItems = (itemsResult.data || []).map(item => ({
           number: item.barcode,
@@ -531,7 +505,7 @@ export const useBoxesStore = defineStore('boxes', () => {
         })() : originalItemsSnapshot
 
         // Добавляем в локальный массив (Pinia persist убран — данные только с сервера)
-        const finishedBoxWithBackend = { ...originalCurrentBox, backendId: currentBox.value.backendId, status: 'finished', items: mergedItems }
+        const finishedBoxWithBackend = { ...originalCurrentBox, backendId, status: 'finished', items: mergedItems }
         boxes.value.push(finishedBoxWithBackend)
 
         // Очищаем currentBox и возвращаем УСПЕШНЫЙ короб (с правильными данными с сервера)
@@ -581,40 +555,39 @@ export const useBoxesStore = defineStore('boxes', () => {
           // Синхронизация удаления на бэкенде
           if (navigator.onLine && currentBox.value.backendId) {
             try {
-              await db.boxItems.deleteItem(currentBox.value.id, itemToRemove.number)
+              await db.boxItems.deleteItem(currentBox.value.backendId, itemToRemove.number)
             } catch {
+              // Rollback при ошибке
               currentBox.value.items.splice(itemIndex, 0, itemToRemove)
-              actionHistory.value.push(lastAction)
             }
           }
-
-          return lastAction.item
         }
       }
     }
 
-    return null
+    return lastAction.item
   }
 
-  /** Удалить конкретный товар из текущего короба */
-  function removeItemFromCurrentBox(index) {
-    if (!currentBox.value || !currentBox.value.items) return false
-    const itemToRemove = currentBox.value.items[index]
-    if (!itemToRemove) return false
+  /** Удаление товара из текущего короба */
+  async function removeItemFromCurrentBox(item) {
+    if (!currentBox.value) return { success: false, error: 'Нет активного короба' }
 
-    // Локально удаляем сразу
-    currentBox.value.items.splice(index, 1)
+    const itemIndex = currentBox.value.items.findIndex(i => i.number === item.number)
+    if (itemIndex === -1) return { success: false, error: 'Товар не найден' }
 
-    // Синхронизация удаления на бэкенде
+    const removedItem = currentBox.value.items[itemIndex]
+    currentBox.value.items.splice(itemIndex, 1)
+
     if (navigator.onLine && currentBox.value.backendId) {
-      db.boxItems.deleteItem(currentBox.value.id, itemToRemove.number).catch(err => {
-        console.error('❌ Не удалось удалить товар из короба:', err)
-        // Rollback при ошибке
-        currentBox.value.items.splice(index, 0, itemToRemove)
-      })
+      try {
+        await db.boxItems.deleteItem(currentBox.value.backendId, removedItem.number)
+      } catch {
+        currentBox.value.items.splice(itemIndex, 0, removedItem)
+        return { success: false, error: 'Не удалось удалить на сервере' }
+      }
     }
 
-    return true
+    return { success: true }
   }
 
   async function cancelCurrentBox() {
@@ -627,8 +600,7 @@ export const useBoxesStore = defineStore('boxes', () => {
       const itemsToDelete = [...(currentBox.value.items || [])]
       await Promise.all(
         itemsToDelete.map(item => 
-          db.boxItems.deleteItem(currentBox.value.id, item.number).catch(err => {
-            console.error('❌ Не удалось удалить товар из короба:', err)
+          db.boxItems.deleteItem(currentBox.value.id, item.number).catch(() => {
           })
         )
       )
@@ -688,7 +660,7 @@ export const useBoxesStore = defineStore('boxes', () => {
     isSyncing.value = true
     
     try {
-      const result = await db.boxes.clearAllFinished()
+      const result = await db.boxes.clearAllFinished({ active: true })
       
       if (result.error) {
         window.showToast(`❌ Ошибка очистки серверной базы: ${result.error.message}`)
@@ -697,8 +669,7 @@ export const useBoxesStore = defineStore('boxes', () => {
 
       // Очищаем локально
       boxes.value = []
-      currentBox.value = null  // M5 fix: не оставляем ghost-короб
-      console.log('✅ Короба очищены, всего:', boxes.value.length)
+      currentBox.value = null
       return { success: true }
     } catch (error) {
       window.showToast(`❌ Ошибка: ${error.message}`)

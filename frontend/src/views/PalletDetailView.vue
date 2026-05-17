@@ -78,9 +78,7 @@ async function loadPallet(palletId) {
       }
     }
 
-    console.log('🏗️ Товаров в паллете:', palletItems.value.length)
   } catch (err) {
-    console.error('❌ Ошибка загрузки паллета:', err)
     error.value = `Ошибка: ${err.message}`
   } finally {
     isLoading.value = false
@@ -111,7 +109,6 @@ async function exportToExcel() {
       window.showToast('Ошибка экспорта: ' + result.error)
     }
   } catch (err) {
-    console.error('Ошибка экспорта:', err)
     window.showToast('❌ Ошибка экспорта')
   }
 }

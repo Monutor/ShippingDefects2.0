@@ -6,8 +6,19 @@ let subscriberId = 0
 
 export function broadcastSSE(event, data) {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
-  for (const [, res] of sseSubscribers) {
-    try { res.write(payload) } catch {}
+  const deadSubscribers = []
+  for (const [id, res] of sseSubscribers) {
+    if (!res.writable) {
+      deadSubscribers.push(id);
+      continue;
+    }
+    try { res.write(payload) } catch {
+      deadSubscribers.push(id);
+    }
+  }
+  // Удаляем мёртвых подписчиков
+  for (const id of deadSubscribers) {
+    sseSubscribers.delete(id);
   }
 }
 
@@ -44,6 +55,10 @@ export async function getSSE(request, reply) {
   }, 15000)
 
   request.raw.on('close', () => {
+    clearInterval(heartbeat)
+    sseSubscribers.delete(id)
+  })
+  request.raw.on('error', () => {
     clearInterval(heartbeat)
     sseSubscribers.delete(id)
   })

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, triggerRef } from 'vue'
-import { auth, db, request } from '@/lib/api.js'
+import { auth, db } from '@/lib/api.js'
 import { isAdmin as checkIsAdmin } from '@/config'
 import { parseBarcodeToBrainNumber } from '@/utils/barcode'
 
@@ -184,12 +184,10 @@ export const usePalletStore = defineStore('pallet', () => {
       }
 
       if (!myPallet) {
-        console.log('⚠️ loadActivePallet: нет своих активных паллетов для employeeId', collectorStore.employeeId)
         return null
       }
       return loadActivePalletById(myPallet, result.data)
     } catch (err) {
-      console.error('❌ loadActivePallet error:', err)
       return null
     }
   }
@@ -199,7 +197,6 @@ export const usePalletStore = defineStore('pallet', () => {
     try {
       const itemsResult = await db.palletItems.getByPalletId(pallet.id)
       if (itemsResult?.data) {
-        console.log('🔍 loadActivePalletById raw data:', itemsResult.data.length, 'items')
         
         // Разделяем box items и остальные
         const boxItems = itemsResult.data.filter(i => i.source_type === 'box')
@@ -226,7 +223,6 @@ export const usePalletStore = defineStore('pallet', () => {
               })
             }
           } catch (err) {
-            console.error('Ошибка загрузки короба из паллета:', boxRef.source_id, err)
           }
         }
         
@@ -253,8 +249,6 @@ export const usePalletStore = defineStore('pallet', () => {
             })
             .filter(Boolean)
         )
-        
-        console.log('✅ loadActivePalletById loaded:', serverItems.length, 'items')
       }
     } catch {
       // ignore
@@ -282,7 +276,6 @@ export const usePalletStore = defineStore('pallet', () => {
       const activePallets = (result.data || []).filter(p => p.status === 'active')
       // BUG-236 fix: не очищаем currentPallet если он создан локально и ещё не синхронизирован
       if (currentPallet.value && currentPallet.value.backendId && !activePallets.some(p => p.id === currentPallet.value.id)) {
-        console.log('🗑️ Stale currentPallet удалён (не найден на сервере)')
         currentPallet.value = null
       }
 
@@ -291,8 +284,6 @@ export const usePalletStore = defineStore('pallet', () => {
         try {
           const itemsResult = await db.palletItems.getByPalletId(pallet.id)
           if (itemsResult?.data) {
-            console.log('🔍 loadAllActivePallets raw data:', itemsResult.data.length, 'items')
-            console.log('📋 Raw sample:', JSON.stringify(itemsResult.data[0]))
             serverItems = itemsResult.data
               .filter(i => i.source_type !== 'box')
               .map(i => {
@@ -328,20 +319,16 @@ export const usePalletStore = defineStore('pallet', () => {
 
               // Если локальные items > 0 и >= серверных — пользователь добавил товар, НЕ перезаписываем!
               if (localItemCount > 0 && localItemCount >= serverItemCount) {
-                console.log('⏭️ loadAllActivePallets: пропускаю обновление currentPallet (local', localItemCount, '>= server', serverItemCount, ')')
               } else if (currentPallet.value.id === pallet.id && localItemCount === 0) {
                 // Загружаем с сервера только если локально пусто — это нормальная загрузка
                 currentPallet.value.items = serverItems
-                console.log('🔄 loadAllActivePallets: загружаю items для текущего паллета (local=0)')
               } else {
-                console.log('⏭️ loadAllActivePallets: пропускаю (pallet id mismatch или local > server)')
               }
             }
           }
         } catch {}
         return { ...pallet, items: serverItems, createdAt: pallet.created_at }
       }))
-      console.log('🏗️ loadAllActivePallets:', palletsWithItems.length, 'паллетов')
       return palletsWithItems
     } catch {
       return []
@@ -395,8 +382,6 @@ export const usePalletStore = defineStore('pallet', () => {
       try {
         const result = await db.palletItems.create(palletId, 'box', box.id)
         if (!result?.data?.id) throw new Error('Не удалось добавить в паллет')
-        // Обновляем статус короба на active чтобы не дублировался в списке
-        await db.boxes.update(box.id, { status: 'active' })
       } catch (err) {
         if (err?.code === '23505' || /duplicate/i.test(err.message)) {
           return { success: false, error: 'duplicate', message: 'Этот микс уже в паллете' }
@@ -452,8 +437,8 @@ export const usePalletStore = defineStore('pallet', () => {
     return true
   }
 
-  /** Проверка глобального дубликата (в других паллетах) — аналогично boxes.js checkGlobalDuplicate */
-  function checkGlobalDuplicate(scannedBarcode) {
+  /** Проверка глобального дубликата (в других паллетах И миксах) — аналогично boxes.js checkGlobalDuplicate */
+  async function checkGlobalDuplicate(scannedBarcode) {
     const parsedNumber = parseBarcodeToBrainNumber(scannedBarcode)
     // Нормализуем: проверяем оба варианта, но в одном проходе
     const searchNumbers = new Set([scannedBarcode])
@@ -468,7 +453,7 @@ export const usePalletStore = defineStore('pallet', () => {
         const normalizedItemNumbers = new Set([item.barcode, itemParsed].filter(Boolean))
         for (const searchNum of searchNumbers) {
           if (normalizedItemNumbers.has(searchNum)) {
-            return { boxNumber: pallet.number || pallet.pallet_number, boxName: pallet.name }
+            return { boxNumber: pallet.number || pallet.pallet_number, boxName: pallet.name, type: 'pallet' }
           }
         }
       }
@@ -481,10 +466,45 @@ export const usePalletStore = defineStore('pallet', () => {
         const normalizedItemNumbers = new Set([item.barcode, itemParsed].filter(Boolean))
         for (const searchNum of searchNumbers) {
           if (normalizedItemNumbers.has(searchNum)) {
-            return { boxNumber: currentPallet.value.number || '', boxName: 'текущий' }
+            return { boxNumber: currentPallet.value.number || '', boxName: 'текущий', type: 'pallet' }
           }
         }
       }
+    }
+
+    // Проверяем миксы (boxes) — импортируем динамически чтобы избежать circular dependency
+    try {
+      const { useBoxesStore } = await import('@/stores/boxes')
+      const boxesStore = useBoxesStore()
+      
+      // Проверяем finished boxes
+      for (const box of boxesStore.boxes) {
+        if (!box.items) continue
+        for (const item of box.items) {
+          const itemParsed = parseBarcodeToBrainNumber(item.number)
+          const normalizedItemNumbers = new Set([item.number, itemParsed].filter(Boolean))
+          for (const searchNum of searchNumbers) {
+            if (normalizedItemNumbers.has(searchNum)) {
+              return { boxNumber: box.number, boxName: box.name, type: 'box' }
+            }
+          }
+        }
+      }
+
+      // Проверяем текущий активный короб
+      if (boxesStore.currentBox && boxesStore.currentBox.items) {
+        for (const item of boxesStore.currentBox.items) {
+          const itemParsed = parseBarcodeToBrainNumber(item.number)
+          const normalizedItemNumbers = new Set([item.number, itemParsed].filter(Boolean))
+          for (const searchNum of searchNumbers) {
+            if (normalizedItemNumbers.has(searchNum)) {
+              return { boxNumber: boxesStore.currentBox.number, boxName: 'текущий микс', type: 'box' }
+            }
+          }
+        }
+      }
+    } catch {
+      // Игнорируем ошибки импорта
     }
 
     return null
@@ -602,11 +622,16 @@ export const usePalletStore = defineStore('pallet', () => {
   }
 
   /** Удалить конкретный товар из паллета с синхронизацией на сервере */
-  async function removeItemFromPallet(index) {
+  async function removeItemFromPallet(item) {
     if (!currentPallet.value || !currentPallet.value.items) return false
 
+    // Находим товар по source_id (надёжнее чем по индексу)
+    const index = currentPallet.value.items.findIndex(i => 
+      i.source_id === item.source_id && i.source_type === item.source_type
+    )
+    if (index === -1) return false
+
     const itemToRemove = currentPallet.value.items[index]
-    if (!itemToRemove) return false
 
     // Локально удаляем сразу (optimistic update)
     currentPallet.value.items.splice(index, 1)
@@ -616,16 +641,13 @@ export const usePalletStore = defineStore('pallet', () => {
       try {
         const st = itemToRemove.originalSourceType || itemToRemove.source_type
         const result = await db.palletItems.delete(currentPallet.value.backendId, st, itemToRemove.source_id)
-        // FIX: корректная проверка — error есть ИЛИ success === false → rollback
         if (result?.error || result?.success === false) {
           window.showToast(`⚠️ Не удалось удалить товар с сервера: ${result.error || 'неизвестная ошибка'}`)
-          // Rollback при ошибке
           currentPallet.value.items.splice(index, 0, itemToRemove)
           return false
         }
       } catch (err) {
         window.showToast(`⚠️ Не удалось удалить товар с сервера: ${err.message}`)
-        // Rollback при ошибке
         currentPallet.value.items.splice(index, 0, itemToRemove)
         return false
       }
@@ -653,11 +675,7 @@ export const usePalletStore = defineStore('pallet', () => {
         scanned_at: i.scannedAt || null
       }))
 
-      // Логирование комментариев товаров при завершении паллета
-      console.log('📦 Завершение паллета — комментарии товаров:')
       itemsToSend.forEach(item => {
-        const label = `${item.source_type}:${item.source_id}`
-        console.log(`  ${label} → comment: "${item.comment}"`)
       })
 
       if (navigator.onLine && currentPallet.value.backendId) {
@@ -671,8 +689,7 @@ export const usePalletStore = defineStore('pallet', () => {
           // BUG-1 fix: ловим PostgreSQL UNIQUE violation (23505) — race condition между pre-check и INSERT.
           // Если товар уже есть на сервере — это не ошибка, считаем как success.
           if (updateErr?.code === '23505' || updateErr?.detail?.includes('duplicate')) {
-            console.log('🔄 finishCurrentPallet: UNIQUE conflict, игнорируем (товар уже на сервере)')
-            result = { data: null, error: null } // success без ошибки
+            result = { data: null, error: null }
           } else {
             throw updateErr
           }
@@ -705,9 +722,7 @@ export const usePalletStore = defineStore('pallet', () => {
             throw new Error(result.error.message)
           }
         } else if (result?.success === false || result?.error) {
-          // Обработка ответа с success: false — аналогично обработке 409 duplicate
           const errorMsg = result.detail || result.message || 'Неизвестная ошибка'
-          console.warn('finishCurrentPallet: server returned error', result)
         }
 
         backendResult = result.data
@@ -770,7 +785,6 @@ export const usePalletStore = defineStore('pallet', () => {
               actionHistory.value.push(lastAction)
               window.showToast(`⚠️ Не удалось отменить: ${result.error || 'ошибка сервера'}`)
             } else {
-              console.log('↩️ undoLastAction: удалено с сервера')
             }
           } catch (err) {
             // Ошибка сети — возвращаем товар обратно
@@ -852,8 +866,7 @@ export const usePalletStore = defineStore('pallet', () => {
       await Promise.all(
         itemsToDelete.map(item => {
           const st = item.originalSourceType || item.source_type
-          return db.palletItems.delete(currentPallet.value.id, st, item.source_id).catch(err => {
-            console.error('❌ Не удалось удалить товар из паллета:', err)
+          return db.palletItems.delete(currentPallet.value.backendId, st, item.source_id).catch(() => {
           })
         })
       )

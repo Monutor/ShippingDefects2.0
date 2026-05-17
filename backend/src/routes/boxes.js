@@ -312,21 +312,31 @@ export default async function boxesRoutes(app) {
   });
 
   /**
-   * DELETE /api/boxes — очистить все finished короба (admin only)
+   * DELETE /api/boxes — очистить все короба (admin only)
    */
   app.delete('/', async (request, reply) => {
     const is_admin = request.user?.is_admin || false;
     if (!is_admin) return reply.code(403).send({ error: 'Только админ' });
 
-    // Удаляем все короба и их items (admin only)
-    await query('DELETE FROM box_items');
-    await query('DELETE FROM boxes');
-    await query("SELECT setval('box_number_seq', 1, false)");
-    console.log('🗑️ Все короба очищены (admin), sequence сброшена');
+    const clearActive = request.query?.active === 'true';
+
+    if (clearActive) {
+      // Удаляем ВСЕ короба (finished + active) и их items
+      await query('DELETE FROM box_items');
+      await query('DELETE FROM boxes');
+      await query("SELECT setval('box_number_seq', 1, false)");
+      app.log.info('Все короба очищены (admin), sequence сброшена');
+    } else {
+      // Удаляем только finished короба и их items — активные короба не трогаем
+      await query('DELETE FROM box_items WHERE box_id IN (SELECT id FROM boxes WHERE status = \'finished\')');
+      await query('DELETE FROM boxes WHERE status = \'finished\'');
+      await query("SELECT setval('box_number_seq', 1, false)");
+      app.log.info('Все finished короба очищены (admin), sequence сброшена');
+    }
 
     // Уведомляем всех клиентов об очистке коробов
     broadcast({ type: 'boxes_cleared' });
 
-    return reply.send({ success: true, deletedBoxes: 'all' });
+    return reply.send({ success: true, deletedBoxes: clearActive ? 'all' : 'all_finished' });
   });
 }

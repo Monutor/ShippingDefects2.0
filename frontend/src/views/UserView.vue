@@ -75,7 +75,6 @@ async function loadStats() {
         stats.value.totalPallets = palletsResult.data.filter(p => p.status === 'finished').length
       }
     } catch (err) {
-      console.warn('Не удалось загрузить статистику с бэкенда:', err.message)
     }
   }
 }
@@ -118,9 +117,7 @@ async function saveProfile() {
       fullName: editForm.value.fullName.trim(),
       position: editForm.value.position.trim() || 'Сборщик'
     })
-    console.log('✅ Профиль синхронизирован с бэкендом')
   } catch (error) {
-    console.error('Ошибка синхронизации профиля:', error)
   }
 
   // Закрываем модалку после сохранения
@@ -137,6 +134,9 @@ async function confirmLogout() {
   showLogoutModal.value = false
   // Очищаем данные авторизации
   localStorage.removeItem('warehouse-brain-user')
+
+  // Очистка интервала синхронизации
+  if (window._appCleanup) window._appCleanup.syncInterval()
 
   // Выход из системы (очищаем локальные данные)
   try {
@@ -226,10 +226,6 @@ const initials = computed(() => {
 
 <template>
   <div class="user-page">
-    <!-- Индикатор подключения -->
-    <div class="connection-status-wrapper">
-    </div>
-
     <h1 class="page-title">Профиль</h1>
 
     <!-- Если не авторизован -->
@@ -292,7 +288,6 @@ const initials = computed(() => {
           </div>
 
           <div class="badge-photo-area">
-            <!-- <div class="photo-pattern"></div> -->
             <img class="company-logo" src='/img/mvideo-1.svg' alt="logo company" width="150" />
           </div>
 
@@ -722,45 +717,6 @@ const initials = computed(() => {
   border-bottom: 2px solid #667eea;
 }
 
-.photo-pattern {
-  width: 80px;
-  height: 80px;
-  background:
-    repeating-linear-gradient(45deg,
-      #667eea,
-      #667eea 10px,
-      #764ba2 10px,
-      #764ba2 20px);
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-  position: relative;
-  overflow: hidden;
-}
-
-.photo-pattern::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 60px;
-  height: 60px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-}
-
-.photo-pattern::after {
-  content: 'WB';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: white;
-  font-size: 1.25rem;
-  font-weight: 700;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
 .badge-content {
   padding: 1.25rem 1rem;
   text-align: center;
@@ -848,25 +804,6 @@ const initials = computed(() => {
   padding: 1.5rem;
   margin-bottom: 1.5rem;
   box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
-}
-
-.avatar {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 1rem;
-  border: 3px solid rgba(255, 255, 255, 0.3);
-}
-
-.avatar-text {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: white;
 }
 
 .profile-info {
@@ -985,25 +922,6 @@ const initials = computed(() => {
   font-size: 0.875rem;
   font-weight: 500;
   color: #e2e8f0;
-}
-
-.form-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-.form-actions button {
-  flex: 1;
-}
-
-/* Позиционирование индикатора подключения */
-.connection-status-wrapper {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 9999;
-  pointer-events: none;
 }
 
 /* Переключатель режима тех.работ */

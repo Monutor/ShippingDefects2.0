@@ -1,4 +1,4 @@
-import { query } from '../db/index.js';
+import { query, pool } from '../db/index.js';
 import { broadcast } from '../ws/broadcast.js';
 
 /** Получить имя владельца контейнера по collector_id */
@@ -18,12 +18,9 @@ function decodeMojibake(text) {
   const hasMojibake = /[╨╤]/.test(text)
   if (!hasMojibake) return text
   try {
-    // Кодируем строку как Windows-1251 (как она была интерпретирована)
-    const encoder = new TextEncoder('windows-1251')
-    const bytes = encoder.encode(text)
-    // Декодируем обратно как UTF-8
-    const decoder = new TextDecoder('utf-8')
-    return decoder.decode(bytes)
+    // TextEncoder поддерживает только UTF-8. Для mojibake recovery
+    // кодируем строку как latin1 (байты как были прочитаны), затем декодируем как UTF-8
+    return Buffer.from(text, 'latin1').toString('utf8')
   } catch {
     return text
   }
@@ -84,8 +81,8 @@ export default async function palletRoutes(app) {
     // Debug: лог всех POST /pallets/:id/items
     app.log.info(`POST pallet item: pallet=${request.params.id.substring(0,8)}... type=${body?.source_type}, id=${body?.source_id}, name="${body?.name}"`);
 
-    if (!body?.source_type || !['box', 'separate_item', 'inline'].includes(body.source_type)) {  // M3 fix: добавляем inline
-      return reply.code(400).send({ error: 'source_type must be "box", "separate_item" or "inline"' });
+    if (!body?.source_type || !['box', 'separate_item', 'inline', 'pallet'].includes(body.source_type)) {
+      return reply.code(400).send({ error: 'source_type must be "box", "separate_item", "inline" or "pallet"' });
     }
 
     // Проверяем что паллет активен и владелец
@@ -166,13 +163,7 @@ export default async function palletRoutes(app) {
     }
 
     if (!itemData || typeof itemData !== 'object') {
-      itemData = {
-        type: 'inline',
-        barcode: String(source_id || ''),
-        name: name || '',
-        article: article || '',
-        comment: comment || ''
-      }
+      return reply.code(400).send({ error: 'Не удалось определить тип товара. Укажите source_type: box, separate_item или inline.' });
     }
 
     let insertResult;
@@ -330,9 +321,9 @@ export default async function palletRoutes(app) {
           item_name: (pi.item_name && pi.item_name.trim()) ? pi.item_name : `Товар ${pi.source_id}`,
           item_barcode: (pi.item_barcode && pi.item_barcode.trim()) ? pi.item_barcode : pi.source_id,
           item_brand: (pi.item_brand && pi.item_brand.trim()) ? pi.item_brand : '',
-          item_model: (pi.model && pi.model.trim()) ? pi.model : '',
-          item_defect_type: (pi.defect_type && pi.defect_type.trim()) ? pi.defect_type : '',
-          item_comment: (pi.comment && pi.comment.trim()) ? pi.comment : '',
+          item_model: (pi.item_model && pi.item_model.trim()) ? pi.item_model : '',
+          item_defect_type: (pi.item_defect_type && pi.item_defect_type.trim()) ? pi.item_defect_type : '',
+          item_comment: (pi.item_comment && pi.item_comment.trim()) ? pi.item_comment : '',
           scanned_at: pi.scanned_at  // читаем из явной колонки
         };
       }
@@ -350,11 +341,13 @@ export default async function palletRoutes(app) {
     const palletId = crypto.randomUUID();
 
     // Уникальный номер через PostgreSQL sequence (устраняет race condition)
-    // Если паллеты удалены — сбрасываем sequence на 1 чтобы нумерация начиналась заново
-    const countResult = await query('SELECT COUNT(*)::int AS cnt FROM pallets');
-    if (countResult[0]?.cnt === 0) {
-      await query("SELECT setval('seq_pallet_number', 1, false)");
-    }
+    // setval с is_called=false когда таблица пуста — nextval вернёт 1, а не 2
+    await query(`
+      SELECT setval('seq_pallet_number', 
+        GREATEST(COALESCE((SELECT MAX(pallet_number) FROM pallets), 0), 1), 
+        (SELECT COUNT(*) FROM pallets) > 0
+      )
+    `);
     const seqResult = await query('SELECT nextval(\'seq_pallet_number\') as pallet_number');
     const palletNumber = seqResult[0]?.pallet_number;
 
@@ -401,7 +394,7 @@ export default async function palletRoutes(app) {
       }
 
       const result = await query(
-        "UPDATE pallets SET status = 'finished', finished_at = NOW(), seal = NULL WHERE id = $1 RETURNING *",
+        "UPDATE pallets SET status = 'finished', finished_at = NOW() WHERE id = $1 RETURNING *",
         [request.params.id]
       );
 
@@ -410,6 +403,9 @@ export default async function palletRoutes(app) {
       }
 
       const seal = generateSeal(request.params.id, result[0].created_at);
+
+      // Сохраняем сгенерированную пломбу в БД
+      await query('UPDATE pallets SET seal = $1 WHERE id = $2', [seal, request.params.id]);
 
       // Получаем все items паллета для экспорта — явные колонки приоритетнее JOIN
       let boxItems = await query(`
@@ -524,13 +520,13 @@ export default async function palletRoutes(app) {
               const actualComment = (dbComment && dbComment.length > 0 && dbComment[0]?.comment) ? dbComment[0].comment : itemComment
 
               // Логирование комментария для отладки
-              console.log(`📝 pallet finish: ${itemEntry.source_id} comment body="${itemComment}" db="${dbComment?.[0]?.comment || ''}" → used="${actualComment}"`)
+              app.log.debug(`pallet finish: ${itemEntry.source_id} comment body="${itemComment}" db="${dbComment?.[0]?.comment || ''}" → used="${actualComment}"`)
 
               await query(
                 `UPDATE pallet_items SET order_num = $4,
                  barcode = $5, name = $6, brand = $7, defect_type = $8, comment = $9, scanned_at = $10
                  WHERE id = $3`,
-                [orderNum, itemBarcode, existing[0].id, itemName, itemBrand, itemDefect, actualComment, itemScannedAt]  // без JSONB после миграции 018
+                [existing[0].id, orderNum, itemBarcode, itemName, itemBrand, itemDefect, actualComment, itemScannedAt]
               )
             } else {
               // Нет дубликата — вставляем новую запись (без JSONB после миграции 018)
@@ -540,8 +536,8 @@ export default async function palletRoutes(app) {
                 [request.params.id, itemEntry.source_type, itemEntry.source_id, orderNum, itemBarcode, itemName, itemBrand, itemDefect, itemComment, itemScannedAt]
               )
             }
-          } catch {
-            // ignore — ошибка уже логируется на уровне приложения
+          } catch (err) {
+            app.log.error('Failed to update pallet item during finish:', err);
           }
         }
 
@@ -633,10 +629,10 @@ export default async function palletRoutes(app) {
       }
 
       // Логирование отправляемых items для отладки комментариев
-      console.log('📋 Backend FINAL response items:')
+      app.log.debug('Backend FINAL response items:')
       for (const item of items) {
         if (item.source_type === 'inline' || item.source_type === 'pallet') {
-          console.log(`  ${item.source_id}: source_type=${item.source_type}, item_comment="${item.item_comment}", _full_data.comment="${item._full_data?.comment}"`)
+          app.log.debug(`  ${item.source_id}: source_type=${item.source_type}, item_comment="${item.item_comment}", _full_data.comment="${item._full_data?.comment}"`)
         }
       }
 
@@ -768,8 +764,19 @@ export default async function palletRoutes(app) {
       return reply.code(400).send({ error: 'Можно удалить только завершённый паллет' });
     }
 
-    await query('DELETE FROM pallet_items WHERE pallet_id = $1', [request.params.id]);
-    await query('DELETE FROM pallets WHERE id = $1', [request.params.id]);
+    // Транзакция: удаляем items и pallet атомарно
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM pallet_items WHERE pallet_id = $1', [request.params.id]);
+      await client.query('DELETE FROM pallets WHERE id = $1', [request.params.id]);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
 
     return reply.send({ success: true, deletedPalletId: request.params.id });
   });
@@ -781,12 +788,22 @@ export default async function palletRoutes(app) {
     const is_admin = request.user?.is_admin || false;
     if (!is_admin) return reply.code(403).send({ error: 'Только админ' });
 
-    // Удаляем только finished паллеты + их items
-    await query("DELETE FROM pallet_items WHERE pallet_id IN (SELECT id FROM pallets WHERE status = 'finished')");
-    await query("DELETE FROM pallets WHERE status = 'finished'");
+    // Транзакция: удаляем finished паллеты + их items атомарно
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("DELETE FROM pallet_items WHERE pallet_id IN (SELECT id FROM pallets WHERE status = 'finished')");
+      await client.query("DELETE FROM pallets WHERE status = 'finished'");
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
     broadcast({ type: 'pallets_cleared' });
 
-    return reply.send({ success: true, deletedPallets: 'all' });
+    return reply.send({ success: true, deletedPallets: 'all_finished' });
   });
 
   /**
@@ -796,10 +813,19 @@ export default async function palletRoutes(app) {
     const is_admin = request.user?.is_admin || false;
     if (!is_admin) return reply.code(403).send({ error: 'Только админ' });
 
-    // Удаляем все items всех паллетов
-    await query('DELETE FROM pallet_items');
-    // Удаляем все паллеты
-    await query('DELETE FROM pallets');
+    // Транзакция: удаляем все items и все pallets атомарно
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM pallet_items');
+      await client.query('DELETE FROM pallets');
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
     broadcast({ type: 'pallets_cleared' });
 
     return reply.send({ success: true, deletedPallets: 'all' });

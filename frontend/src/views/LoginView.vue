@@ -21,8 +21,6 @@ onMounted(() => {
     router.push('/')
     return
   }
-  
-  console.log('🔍 LoginView onMounted: no token, showing login form')
 })
 
 async function handleLogin() {
@@ -35,9 +33,7 @@ async function handleLogin() {
   error.value = null
 
   try {
-    console.log('🔍 Login step 1: отправляем employeeId =', employeeId.value.trim())
     const result = await auth.login(employeeId.value.trim())
-    console.log('📦 Ответ:', result)
 
     if (result.data) {
       // Профиль найден — авторизуем
@@ -62,7 +58,6 @@ async function handleLogin() {
         authenticatedAt: new Date().toISOString()
       }))
 
-      console.log('✅ Профиль загружен:', profile.full_name, 'isAdmin:', isAdmin)
       window.dispatchEvent(new CustomEvent('auth-changed'))
       // BUG-9 fix: переподключаем WS после успешного логина (токен появился)
       const { ws } = await import('@/lib/api.js')
@@ -78,8 +73,6 @@ async function handleLogin() {
       isLoading.value = false
     }
   } catch (err) {
-    console.error('Ошибка проверки табельного номера:', err)
-    // L3 fix: показываем ошибку вместо перехода на регистрацию
     error.value = `Ошибка соединения с сервером: ${err.message || 'Проверьте подключение к сети'}`
     isLoading.value = false
   }
@@ -124,7 +117,6 @@ async function handleRegister() {
         authenticatedAt: new Date().toISOString()
       }))
 
-      console.log('✅ Регистрация завершена:', fullName.value, 'isAdmin:', isAdmin)
       window.dispatchEvent(new CustomEvent('auth-changed'))
       // BUG-9 fix: переподключаем WS после регистрации (токен появился)
       const { ws } = await import('@/lib/api.js')
