@@ -60,11 +60,20 @@ export default async function separateRoutes(app) {
       if (is_admin) {
         deleteResult = await queryRaw('DELETE FROM separate_items WHERE barcode = $1', [barcode])
       } else {
+        // Сначала пробуем separate items без контейнера ( SeparateView )
         deleteResult = await queryRaw(
-          `DELETE FROM separate_items si USING boxes b
-           WHERE si.barcode = $1 AND si.container_id::text = b.id::text AND si.container_type = 'box' AND b.collector_id = $2`,
-          [barcode, request.user.employeeId]
+          'DELETE FROM separate_items WHERE barcode = $1 AND container_id IS NULL',
+          [barcode]
         )
+        // Если не нашли — пробуем box
+        if (!deleteResult?.rowCount) {
+          deleteResult = await queryRaw(
+            `DELETE FROM separate_items si USING boxes b
+             WHERE si.barcode = $1 AND si.container_id::text = b.id::text AND si.container_type = 'box' AND b.collector_id = $2`,
+            [barcode, request.user.employeeId]
+          )
+        }
+        // Если не нашли — пробуем pallet
         if (!deleteResult?.rowCount) {
           deleteResult = await queryRaw(
             `DELETE FROM separate_items si USING pallets p
@@ -125,14 +134,20 @@ export default async function separateRoutes(app) {
       // Admin может удалять любой item по barcode
       deleteResult = await queryRaw('DELETE FROM separate_items WHERE barcode = $1', [param]);
     } else {
-      // Обычный пользователь — только если item из его контейнера (box или pallet)
+      // Сначала пробуем separate items без контейнера
       deleteResult = await queryRaw(
-        `DELETE FROM separate_items si USING boxes b
-         WHERE si.barcode = $1 AND si.container_id::text = b.id::text AND si.container_type = 'box' AND b.collector_id = $2`,
-        [param, request.user.employeeId]
+        'DELETE FROM separate_items WHERE barcode = $1 AND container_id IS NULL',
+        [param]
       );
-
-      // Если не нашли в box — пробуем pallet (через pallets через boxes)
+      // Если не нашли — пробуем box
+      if (!deleteResult?.rowCount) {
+        deleteResult = await queryRaw(
+          `DELETE FROM separate_items si USING boxes b
+           WHERE si.barcode = $1 AND si.container_id::text = b.id::text AND si.container_type = 'box' AND b.collector_id = $2`,
+          [param, request.user.employeeId]
+        );
+      }
+      // Если не нашли — пробуем pallet
       if (!deleteResult?.rowCount) {
         deleteResult = await queryRaw(
           `DELETE FROM separate_items si USING pallets p
