@@ -227,32 +227,32 @@ async function confirmClear() {
           <button
             :class="[
               'py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2',
-              sc.scanMode === 'tsd'
+              sc.scanMode.value === 'tsd'
                 ? 'bg-gradient-to-r from-primary-500 to-primary-700 text-white shadow-lg shadow-primary-500/30'
                 : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700'
             ]"
-            @click="sc.scanMode = 'tsd'"
+            @click="sc.scanMode.value = 'tsd'"
           >
             <img src="/img/bank-terminal.svg" alt="ТСД" class="w-5 h-5" /> ТСД
           </button>
           <button
             :class="[
               'py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2',
-              sc.scanMode === 'camera'
+              sc.scanMode.value === 'camera'
                 ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30'
                 : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700'
             ]"
-            @click="sc.scanMode = 'camera'"
+            @click="sc.scanMode.value = 'camera'"
           >
             <img src="/img/camera-svg.svg" alt="Камера" class="w-5 h-5" /> Камера
           </button>
         </div>
       </div>
 
-      <div v-if="sc.scanMode === 'tsd'" class="tsd-input-wrapper mb-4">
+      <div v-if="sc.scanMode.value === 'tsd'" class="tsd-input-wrapper mb-4">
         <div class="flex items-center gap-2">
           <Input
-            v-model="sc.tsdInput"
+            v-model="sc.tsdInput.value"
             placeholder="Сканируйте или введите номер"
             icon="scan"
             clearable
@@ -281,19 +281,19 @@ async function confirmClear() {
         </div>
       </div>
 
-      <div v-if="sc.scanMode === 'camera'" class="scan-section mb-4">
+      <div v-if="sc.scanMode.value === 'camera'" class="scan-section mb-4">
         <Button
-          :loading="sc.isScanning"
+          :loading="sc.isScanning.value"
           :class="[
             'w-full py-4 rounded-2xl text-base font-semibold shadow-lg',
-            sc.isScanning
+            sc.isScanning.value
               ? 'bg-gradient-to-r from-rose-500 to-rose-700 shadow-rose-500/30'
               : 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/30'
           ]"
           @click="startScanner"
         >
-          <van-icon :name="sc.isScanning ? 'play-circle-o' : 'scan'" size="20" />
-          {{ sc.isScanning ? 'Сканирование...' : 'Старт' }}
+          <van-icon :name="sc.isScanning.value ? 'play-circle-o' : 'scan'" size="20" />
+          {{ sc.isScanning.value ? 'Сканирование...' : 'Старт' }}
         </Button>
         <p class="text-sm text-slate-500 mt-3 text-center">📷 Нажмите «Старт» для сканирования</p>
       </div>
