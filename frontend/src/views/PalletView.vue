@@ -5,9 +5,9 @@ import { useBrainStore } from '@/stores/brain'
 import { useBoxesStore } from '@/stores/boxes'
 import { useCollectorStore } from '@/stores/collector'
 import { usePalletStore } from '@/stores/pallet'
-import { createScanner, checkCameraSupport } from '@/utils/scanner'
+import { useScanner } from '@/composables/useScanner'
 import { parseBarcodeToBrainNumber, ensurePrefix } from '@/utils/barcode'
-import { initSounds, playSound } from '@/utils/sound'
+import { playSound } from '@/utils/sound'
 import { Button, Input, Badge, NavBar, Modal } from '@/components/ui'
 import { db, ws } from '@/lib/api.js'
 
@@ -17,10 +17,8 @@ const boxesStore = useBoxesStore()
 const collectorStore = useCollectorStore()
 const palletStore = usePalletStore()
 
-// Reactive counter для принудительного обновления UI при добавлении товара в паллет
 const _palletRefreshCounter = ref(0)
 
-// Watch на palletItemsVersion из store — когда он меняется, увеличиваем counter
 watch(
   () => palletStore.palletItemsVersion,
   (version) => {
@@ -31,7 +29,6 @@ watch(
   { deep: true, immediate: false }
 )
 
-// ADDITIONAL FIX: прямое наблюдение за массивом items для гарантии реактивности
 watch(
   () => palletStore.currentPallet?.items,
   (newItems, oldItems) => {
@@ -42,25 +39,16 @@ watch(
   { deep: true, immediate: false }
 )
 
-// Вычисляемое: товары паллета (упрощённая версия как в MixView)
 const palletItemsSimple = computed(() => {
-  // Используем _palletRefreshCounter как dependency для гарантии реактивности
   const _versionTrigger = _palletRefreshCounter.value
-
   if (!palletStore.currentPallet?.items) return []
-  // Просто возвращаем массив в обратном порядке — как в MixView!
   const items = palletStore.currentPallet.items || []
-
-  // versionCheck — dependency для computed property
   const _versionCheck = palletStore.palletItemsVersion
-
   return [...items].reverse()
 })
 
-// Вычисляемое: детали паллета (separate items с полными данными)
 const palletItemsWithDetails = computed(() => {
-  const simpleItems = palletItemsSimple.value // Используем упрощённый computed!
-
+  const simpleItems = palletItemsSimple.value
   if (!simpleItems || simpleItems.length === 0) return []
 
   const result = []
@@ -72,11 +60,7 @@ const palletItemsWithDetails = computed(() => {
         article: ref.article || '',
         comment: ref.comment || ''
       }
-
-      if (!data.number && data.name.startsWith('Товар 1')) {
-        continue
-      }
-
+      if (!data.number && data.name.startsWith('Товар 1')) continue
       if (!data.name || data.name.startsWith('Товар') || !ref.name) {
         const found = brainStore.findByBarcode(data.number)
         if (found && found.name) {
@@ -86,17 +70,13 @@ const palletItemsWithDetails = computed(() => {
           const parsedNum = parseBarcodeToBrainNumber(data.number)
           if (parsedNum !== data.number) {
             const found2 = brainStore.findByBarcode(parsedNum)
-            if (found2 && found2.name) {
-              data.name = found2.name
-            }
+            if (found2 && found2.name) data.name = found2.name
           }
         }
       }
-
       result.push({ ...data, source_id: ref.source_id, source_type: ref.source_type })
     } else if (ref.source_type === 'separate_item') {
       let data = ref._full_data
-
       if (!data && ref.name) {
         data = {
           number: ref.barcode || '',
@@ -105,68 +85,37 @@ const palletItemsWithDetails = computed(() => {
           comment: ref.comment || ''
         }
       }
-
       if (!data) {
         const found = palletStore.availableSeparateItems.find((i) => i.id === ref.source_id)
         if (found) {
-          data = {
-            number: found.barcode,
-            name: found.name,
-            article: found.brand || '',
-            comment: found.comment || ''
-          }
+          data = { number: found.barcode, name: found.name, article: found.brand || '', comment: found.comment || '' }
         }
       }
-
-      if (!data) {
-        data = { number: String(ref.source_id), name: 'Товар', article: '' }
-      }
-
+      if (!data) data = { number: String(ref.source_id), name: 'Товар', article: '' }
       result.push({ ...data, source_id: ref.source_id, source_type: ref.source_type })
     } else if (ref.source_type === 'box') {
       const box = palletStore.availableBoxes.find((b) => b.id === ref.source_id)
       if (box) {
         result.push({
-          number: `Микс #${box.number}`,
-          name: `${box.name} (${box.itemCount || 0} товаров)`,
-          article: '',
-          comment: 'Готовый микс',
-          isBoxRef: true,
-          source_id: ref.source_id,
-          source_type: 'box'
+          number: `Микс #${box.number}`, name: `${box.name} (${box.itemCount || 0} товаров)`,
+          article: '', comment: 'Готовый микс', isBoxRef: true, source_id: ref.source_id, source_type: 'box'
         })
       } else if (ref._boxNumber || ref._boxName) {
         result.push({
-          number: `Микс #${ref._boxNumber || ref.source_id}`,
-          name: `${ref._boxName || 'Микс'} (${ref._boxItemCount || 0} товаров)`,
-          article: '',
-          comment: 'Готовый микс',
-          isBoxRef: true,
-          source_id: ref.source_id,
-          source_type: 'box'
+          number: `Микс #${ref._boxNumber || ref.source_id}`, name: `${ref._boxName || 'Микс'} (${ref._boxItemCount || 0} товаров)`,
+          article: '', comment: 'Готовый микс', isBoxRef: true, source_id: ref.source_id, source_type: 'box'
         })
       }
     }
   }
-
   return result
 })
 
-// Состояние
 const showScanner = ref(false)
-const isScanning = ref(false)
-const scannerElementId = 'barcode-scanner'
-let scanner = null
-
-const scanMode = ref('tsd')
-const tsdInput = ref('')
-const isProcessingTsd = ref(false)
-const isProcessingScan = ref(false)
 const showStopItemModal = ref(false)
 const currentStopItem = ref(null)
 const showFinishModal = ref(false)
 
-// Модальное окно удаления товара
 const showRemoveModal = ref(false)
 const removeItemRef = ref(null)
 
@@ -179,21 +128,16 @@ async function confirmRemoveItem() {
   if (removeItemRef.value) {
     await palletStore.removeItemFromPallet(removeItemRef.value)
     window.showToast('Товар удалён')
-    // Если удалили микс — обновляем список доступных
-    if (removeItemRef.value.source_type === 'box') {
-      await loadAvailableMixes()
-    }
+    if (removeItemRef.value.source_type === 'box') await loadAvailableMixes()
   }
   showRemoveModal.value = false
   removeItemRef.value = null
 }
 
-// Активные контейнеры
 const activePallets = ref([])
 const _allActivePallets = ref([])
 let allPalletsGlobal = []
 
-// Готовые миксы
 const availableMixes = ref([])
 const isLoadingMixes = ref(false)
 
@@ -203,41 +147,24 @@ async function loadAvailableMixes() {
     const result = await db.boxes.getAll()
     if (result?.data) {
       const boxes = (result.data || []).filter((b) => b.status === 'finished')
-
-      // Собираем ID миксов из текущего паллета (локальные данные всегда актуальны)
       const usedBoxIds = new Set()
       if (palletStore.currentPallet?.items) {
         for (const item of palletStore.currentPallet.items) {
           if (item.source_type === 'box') usedBoxIds.add(item.source_id)
         }
       }
-
       availableMixes.value = await Promise.all(
-        boxes
-          .filter((b) => !usedBoxIds.has(b.id))
-          .map(async (box) => {
-            let itemCount = 0
-            let boxItems = []
-            try {
-              const itemsResult = await db.boxItems.getByBoxId(box.id)
-              boxItems = itemsResult?.data || []
-              itemCount = boxItems.length
-            } catch {}
-            return {
-              id: box.id,
-              number: box.box_number || 0,
-              name: box.name || `Микс ${box.box_number}`,
-              itemCount,
-              items: boxItems,
-              createdAt: box.created_at
-            }
-          })
+        boxes.filter((b) => !usedBoxIds.has(b.id)).map(async (box) => {
+          let itemCount = 0
+          try {
+            const itemsResult = await db.boxItems.getByBoxId(box.id)
+            itemCount = (itemsResult?.data || []).length
+          } catch {}
+          return { id: box.id, number: box.box_number || 0, name: box.name || `Микс ${box.box_number}`, itemCount, createdAt: box.created_at }
+        })
       )
     }
-  } catch (err) {
-  } finally {
-    isLoadingMixes.value = false
-  }
+  } catch (err) {} finally { isLoadingMixes.value = false }
 }
 
 async function addMixToPallet(box) {
@@ -253,40 +180,27 @@ async function addMixToPallet(box) {
   }
 }
 
-// WS обработчики
 function palletCreatedHandler(msg) {
   if (msg.pallet_id && !_allActivePallets.value.find((p) => p.id === msg.pallet_id)) {
     const newPallet = { id: msg.pallet_id, collector_id: msg.collector_id }
-
-    if (msg.collector_id === collectorStore.employeeId) {
-      activePallets.value.push(newPallet)
-    }
+    if (msg.collector_id === collectorStore.employeeId) activePallets.value.push(newPallet)
     _allActivePallets.value.push(newPallet)
   }
 }
 
-// Загрузка активных паллетов
 async function loadActiveContainers() {
   if (!navigator.onLine) return
-
-  const allBoxes = (await boxesStore.loadAllActiveBoxes()) || []
+  await boxesStore.loadAllActiveBoxes()
   const allPallets = (await palletStore.loadAllActivePallets()) || []
-
-  const employeeId = collectorStore.employeeId
-
-  activePallets.value = allPallets.filter((p) => p.collector_id === employeeId)
-
-  // Сохраняем все для loadActivePalletById (нужен полный массив всех паллетов)
+  activePallets.value = allPallets.filter((p) => p.collector_id === collectorStore.employeeId)
   allPalletsGlobal = allPallets
 }
 
-// Выбор активного паллета
 function selectPallet(pallet) {
   palletStore.currentPallet = pallet
   window.showToast(`Открыт паллет ${pallet.name || ''}`, 2000, 'default')
 }
 
-// Создание нового паллета и выбор его
 async function createAndSelectNewPallet() {
   await palletStore.createPallet()
   await loadActiveContainers()
@@ -296,14 +210,7 @@ async function createAndSelectNewPallet() {
   }
 }
 
-// Сканирование
-function handleStopScanner() {
-  stopScanner()
-  showScanner.value = false
-}
-
 async function processScannedCode(barcode) {
-  // Проверяем стоп-товар
   const item = brainStore.findByBarcode(barcode)
   if (item?.comment && /не согласован|ждем согласования|ждем решения/i.test(item.comment)) {
     currentStopItem.value = item
@@ -313,9 +220,7 @@ async function processScannedCode(barcode) {
     return null
   }
 
-  // Добавляем префикс если нужно
   const normalizedBarcode = ensurePrefix(parseBarcodeToBrainNumber(barcode))
-
   if (!normalizedBarcode) {
     window.showToast(`Неверный формат: ${barcode}`)
     if (navigator.vibrate) navigator.vibrate([50, 30, 50])
@@ -323,7 +228,6 @@ async function processScannedCode(barcode) {
     return null
   }
 
-  // Проверяем глобальный дубликат (async — проверяет и паллеты, и миксы)
   const duplicateInOthers = await palletStore.checkGlobalDuplicate(normalizedBarcode)
   if (duplicateInOthers) {
     const containerType = duplicateInOthers.type === 'box' ? 'миксе' : 'паллете'
@@ -333,24 +237,14 @@ async function processScannedCode(barcode) {
     return null
   }
 
-  // Добавляем товар в текущий паллет
   const scannedAt = new Date().toISOString()
   const itemData = item
-    ? {
-        number: normalizedBarcode,
-        name: item.name,
-        article: item.article,
-        comment: item.comment,
-        scannedAt
-      }
+    ? { number: normalizedBarcode, name: item.name, article: item.article, comment: item.comment, scannedAt }
     : { number: normalizedBarcode, name: `Товар ${normalizedBarcode}`, scannedAt }
   const result = await palletStore.addInlineItemToPallet(itemData)
   if (result.success) {
     window.showToast(`✅ Товар добавлен`, 1000, 'success')
-
-    // FIX: принудительное обновление UI
     nextTick(() => {})
-
     return { name: item?.name || `Товар ${normalizedBarcode}`, barcode }
   } else {
     window.showToast(`️ Не удалось добавить товар`, 3000, 'error')
@@ -360,75 +254,18 @@ async function processScannedCode(barcode) {
   }
 }
 
-async function handleTsdInput() {
-  if (isProcessingScan.value) return
-  let input = tsdInput.value?.trim()
-  if (!input) return
-
-  isProcessingScan.value = true
-  const parsed = parseBarcodeToBrainNumber(input)
-  let barcode = ensurePrefix(parsed)
-  if (!barcode) {
-    window.showToast(`Неверный формат: ${input}`)
-    isProcessingScan.value = false
-    tsdInput.value = ''
-    return
-  }
-  await processScannedCode(barcode)
-  if (navigator.vibrate) navigator.vibrate(50)
-  playSound('success')
-  tsdInput.value = ''
-  nextTick(() => {
-    isProcessingScan.value = false // Сбрасываем после завершения processScannedCode
-  })
-}
-
-// Сканирование камерой
 async function startScanner() {
-  if (isScanning.value || !navigator.onLine) return
-  const hasCamera = await checkCameraSupport()
-  if (!hasCamera) {
-    window.showToast('Камера не найдена')
-    return
-  }
-
-  // Открываем модалку сканера
+  if (!navigator.onLine) return
   showScanner.value = true
-
-  // Ждём пока модалка отрисуется и элемент появится в DOM
   await nextTick()
-  await new Promise((resolve) => setTimeout(resolve, 300))
-
-  if (!document.getElementById(scannerElementId)) {
-    showScanner.value = false
-    return
-  }
-
-  // Ждём завершения предыдущего перехода (html5-qrcode bug fix)
-  await new Promise((resolve) => setTimeout(resolve, 500))
-
-  initSounds()
-  isScanning.value = true
-  const onScanSuccess = async (barcode) => {
-    if (navigator.vibrate) navigator.vibrate(50)
-    playSound('success')
-    await processScannedCode(barcode)
-  }
-
-  scanner = createScanner({ elementId: scannerElementId })
-
-  // Запускаем сканирование после инициализации
-  scanner.start(onScanSuccess, {})
+  await sc.startScanner()
 }
 
-function stopScanner() {
-  if (scanner && scanner.stop) {
-    scanner.stop()
-    isScanning.value = false
-  }
+function handleStopScanner() {
+  sc.stopScanner()
+  showScanner.value = false
 }
 
-// Завершение паллета
 async function finishPallet() {
   if (!palletStore.currentPallet || (palletStore.currentPallet.items || []).length === 0) {
     window.showToast('Паллет пуст')
@@ -439,21 +276,14 @@ async function finishPallet() {
 
 async function confirmFinish() {
   showFinishModal.value = false
-
   const finishedPallet = await palletStore.finishCurrentPallet()
-
   if (finishedPallet) {
     window.showToast(`✅ Паллет ${finishedPallet.name} завершён. Пломба: ${finishedPallet.seal}`)
     try {
       const { exportPalletToExcel } = await import('@/utils/excel')
-      const collector = {
-        fullName: collectorStore.fullName || '',
-        position: collectorStore.position || ''
-      }
-      const result = await exportPalletToExcel(finishedPallet, collector)
+      const result = await exportPalletToExcel(finishedPallet, { fullName: collectorStore.fullName || '', position: collectorStore.position || '' })
       if (result.success) window.showToast(`Файл скачан: ${result.filename}`)
     } catch {}
-
     loadActiveContainers()
   } else {
     window.showToast('❌ Ошибка завершения паллета')
@@ -466,7 +296,6 @@ async function cancelPallet() {
   _allActivePallets.value = []
 }
 
-// Отмена действия
 async function performUndo() {
   const undoneItem = await palletStore.undoLastAction()
   if (undoneItem) {
@@ -478,22 +307,17 @@ async function performUndo() {
   }
 }
 
-// Обновить товары паллета с сервера
 async function refreshPalletItems() {
   if (!palletStore.currentPallet?.backendId) {
     window.showToast('Нет текущего паллета', 1500)
     return
   }
-
   try {
     const itemsResult = await db.palletItems.getByPalletId(palletStore.currentPallet.backendId)
     if (itemsResult?.data) {
       const boxRefs = itemsResult.data.filter((i) => i.source_type === 'box')
       const otherRefs = itemsResult.data.filter((i) => i.source_type !== 'box')
-
       const serverItems = []
-
-      // Загружаем короба
       for (const boxRef of boxRefs) {
         try {
           const boxResult = await db.boxes.getById(boxRef.source_id)
@@ -501,35 +325,22 @@ async function refreshPalletItems() {
             const boxItemsResult = await db.boxItems.getByBoxId(boxRef.source_id)
             const boxItemsList = boxItemsResult?.data || []
             serverItems.push({
-              source_type: 'box',
-              source_id: boxRef.source_id,
-              order_num: boxResult.data.box_number || 0,
+              source_type: 'box', source_id: boxRef.source_id, order_num: boxResult.data.box_number || 0,
               _full_data: boxItemsList.length > 0 ? { items: boxItemsList } : null,
               _undoId: crypto.randomUUID ? crypto.randomUUID() : `undo-${Date.now()}`,
-              _boxNumber: boxResult.data.box_number || 0,
-              _boxName: boxResult.data.name || `Микс ${boxResult.data.box_number}`,
+              _boxNumber: boxResult.data.box_number || 0, _boxName: boxResult.data.name || `Микс ${boxResult.data.box_number}`,
               _boxItemCount: boxItemsList.length
             })
           }
         } catch {}
       }
-
-      // Загружаем non-box items
-      serverItems.push(
-        ...otherRefs
-          .map((i) => ({
-            source_type:
-              i.source_type === 'pallet' || i.source_type === 'inline' ? 'pallet' : i.source_type,
-            source_id: i.source_id,
-            barcode: i.item_barcode || '',
-            name: i.item_name && i.item_name.trim() ? i.item_name : `Товар ${i.source_id}`,
-            article: i.item_brand && i.item_brand.trim() ? i.item_brand : '',
-            comment: i.item_comment && i.item_comment.trim() ? i.item_comment : '',
-            scannedAt: i.scanned_at || ''
-          }))
-          .filter(Boolean)
-      )
-
+      serverItems.push(...otherRefs.map((i) => ({
+        source_type: i.source_type === 'pallet' || i.source_type === 'inline' ? 'pallet' : i.source_type,
+        source_id: i.source_id, barcode: i.item_barcode || '',
+        name: i.item_name && i.item_name.trim() ? i.item_name : `Товар ${i.source_id}`,
+        article: i.item_brand && i.item_brand.trim() ? i.item_brand : '',
+        comment: i.item_comment && i.item_comment.trim() ? i.item_comment : '', scannedAt: i.scanned_at || ''
+      })).filter(Boolean))
       palletStore.currentPallet = { ...palletStore.currentPallet, items: serverItems }
       palletStore.triggerPalletItemsUpdate()
       window.showToast('Обновлено', 1500)
@@ -539,31 +350,23 @@ async function refreshPalletItems() {
   }
 }
 
-// Удаление товара из паллета
-function removeItem(item) {
-  requestRemoveItem(item)
-}
+function removeItem(item) { requestRemoveItem(item) }
 
-// Проверка владения текущим контейнером
 const isContainerOwner = computed(() => {
   const container = palletStore.currentPallet
   if (!container?.collector_id) return true
   return container.collector_id === collectorStore.employeeId
 })
 
-// Загрузка при монтировании
+const sc = useScanner({
+  elementId: 'barcode-scanner',
+  onScanSuccess: processScannedCode
+})
+
 onMounted(async () => {
-  initSounds()
   ws.on('pallet_created', palletCreatedHandler)
-
-  // Не перезагружаем паллеты если уже есть currentPallet — он мог быть обновлён из ScanView
   const hadExistingPallet = !!palletStore.currentPallet?.backendId
-
-  if (navigator.onLine && !hadExistingPallet) {
-    await loadActiveContainers()
-  }
-
-  // BUG-219 fix: автовыбор только СВОИХ паллетов
+  if (navigator.onLine && !hadExistingPallet) await loadActiveContainers()
   if (!hadExistingPallet && activePallets.value.length > 0 && !palletStore.currentPallet) {
     const myPallet = activePallets.value.find((p) => p.collector_id === collectorStore.employeeId)
     if (myPallet) {
@@ -571,25 +374,21 @@ onMounted(async () => {
       palletStore.currentPallet = await palletStore.loadActivePalletById(last, allPalletsGlobal)
     }
   } else if (hadExistingPallet && navigator.onLine) {
-    // Если уже есть паллет — обновляем только список activePallets для UI
     const result = await db.pallets.getAll()
     if (result?.data) {
       allPalletsGlobal = result.data
       const { useCollectorStore } = await import('@/stores/collector')
       const collectorStore = useCollectorStore()
-      activePallets.value = (result.data || []).filter(
-        (p) => p.status === 'active' && p.collector_id === collectorStore.employeeId
-      )
+      activePallets.value = (result.data || []).filter((p) => p.status === 'active' && p.collector_id === collectorStore.employeeId)
     }
   }
-
   window.addEventListener('keydown', handleKeyDown)
   loadAvailableMixes()
 })
 
 onUnmounted(() => {
   ws.off('pallet_created', palletCreatedHandler)
-  stopScanner()
+  sc.cleanupScanner()
   window.removeEventListener('keydown', handleKeyDown)
 })
 
@@ -602,10 +401,7 @@ function handleKeyDown(event) {
 </script>
 
 <template>
-  <div
-    class="pallet-view min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 pb-20"
-  >
-    <!-- Nav Bar -->
+  <div class="pallet-view min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 pb-20">
     <NavBar
       title="Паллеты"
       left-text="Назад"
@@ -619,78 +415,32 @@ function handleKeyDown(event) {
       "
     />
 
-    <!-- Основной контент -->
     <main class="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
-      <!-- Статус бар -->
-      <div
-        v-if="palletStore.currentPallet"
-        class="status-bar bg-slate-800/80 border border-slate-700 rounded-2xl p-4 text-center"
-      >
+      <div v-if="palletStore.currentPallet" class="status-bar bg-slate-800/80 border border-slate-700 rounded-2xl p-4 text-center">
         <div class="flex items-center justify-center gap-3 mb-2">
           <Badge :count="palletStore.currentPallet?.items?.length || 0" variant="info" />
-          <span class="text-slate-100 font-medium">{{
-            palletStore.currentPallet?.name || 'Паллет не выбран'
-          }}</span>
+          <span class="text-slate-100 font-medium">{{ palletStore.currentPallet?.name || 'Паллет не выбран' }}</span>
         </div>
       </div>
 
-      <!-- Пустое состояние — нет активного паллета и нет активных паллетов -->
-      <div
-        v-if="!palletStore.currentPallet && activePallets.length === 0"
-        class="absolute inset-0 flex flex-col items-center justify-center"
-      >
-        <button
-          class="w-20 h-20 rounded-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 flex items-center justify-center transition-colors shadow-lg shadow-blue-600/30"
-          @click="createAndSelectNewPallet()"
-        >
-          <svg
-            class="w-10 h-10 text-white"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
+      <div v-if="!palletStore.currentPallet && activePallets.length === 0" class="absolute inset-0 flex flex-col items-center justify-center">
+        <button class="w-20 h-20 rounded-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 flex items-center justify-center transition-colors shadow-lg shadow-blue-600/30" @click="createAndSelectNewPallet()">
+          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
         </button>
         <p class="mt-4 text-slate-400 text-sm">Создайте паллет для начала работы</p>
       </div>
 
-      <!-- Пустое состояние — нет активного паллета, но есть активные паллеты -->
-      <div
-        v-if="!palletStore.currentPallet && activePallets.length > 0"
-        class="flex flex-col items-center justify-center py-8"
-      >
-        <button
-          class="w-16 h-16 rounded-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 flex items-center justify-center transition-colors shadow-lg shadow-blue-600/30"
-          @click="createAndSelectNewPallet()"
-        >
-          <svg
-            class="w-8 h-8 text-white"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
+      <div v-if="!palletStore.currentPallet && activePallets.length > 0" class="flex flex-col items-center justify-center py-8">
+        <button class="w-16 h-16 rounded-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 flex items-center justify-center transition-colors shadow-lg shadow-blue-600/30" @click="createAndSelectNewPallet()">
+          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
         </button>
         <p class="mt-3 text-slate-400 text-sm">Создайте паллет для начала работы</p>
       </div>
 
-      <!-- Список активных паллетов -->
-      <div
-        v-if="!palletStore.currentPallet && activePallets.length > 0"
-        class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4"
-      >
+      <div v-if="!palletStore.currentPallet && activePallets.length > 0" class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4">
         <h3 class="font-semibold text-slate-100 mb-3">Или выберите существующий</h3>
         <div class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin">
-          <div
-            v-for="pallet in activePallets"
-            :key="'p' + pallet.id"
-            class="item-row p-3 rounded-xl bg-slate-700/80 hover:bg-slate-600 cursor-pointer transition-colors"
-            @click="selectPallet(pallet)"
-          >
+          <div v-for="pallet in activePallets" :key="'p' + pallet.id" class="item-row p-3 rounded-xl bg-slate-700/80 hover:bg-slate-600 cursor-pointer transition-colors" @click="selectPallet(pallet)">
             <div class="flex items-center justify-between">
               <span class="text-sm font-medium text-slate-100">{{ pallet.name || 'Паллет' }}</span>
               <span class="text-xs text-slate-400">Собиратель: {{ pallet.collector_id }}</span>
@@ -699,323 +449,126 @@ function handleKeyDown(event) {
         </div>
       </div>
 
-      <!-- Сканер -->
-      <div
-        v-if="palletStore.currentPallet"
-        class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4"
-      >
+      <div v-if="palletStore.currentPallet" class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4">
         <h3 class="font-semibold text-slate-100 mb-3 flex items-center gap-2">
-          <van-icon name="scan" class="text-primary-400" />
-          Сканирование
+          <van-icon name="scan" class="text-primary-400" /> Сканирование
         </h3>
 
-        <!-- Переключатель режимов - 50/50 -->
         <div class="mode-switcher mb-4">
           <div class="grid grid-cols-2 gap-3">
-            <button
-              :class="[
-                'py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2',
-                scanMode === 'tsd'
-                  ? 'bg-gradient-to-r from-primary-500 to-primary-700 text-white shadow-lg shadow-primary-500/30'
-                  : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700'
-              ]"
-              @click="scanMode = 'tsd'"
-            >
-              <img src="/img/bank-terminal.svg" alt="ТСД" class="w-5 h-5" />
-              ТСД
+            <button :class="['py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2', sc.scanMode === 'tsd' ? 'bg-gradient-to-r from-primary-500 to-primary-700 text-white shadow-lg shadow-primary-500/30' : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700']" @click="sc.scanMode = 'tsd'">
+              <img src="/img/bank-terminal.svg" alt="ТСД" class="w-5 h-5" /> ТСД
             </button>
-            <button
-              :class="[
-                'py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2',
-                scanMode === 'camera'
-                  ? 'bg-gradient-to-r from-purple-500 to-purple-700 text-white shadow-lg shadow-purple-500/30'
-                  : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700'
-              ]"
-              @click="scanMode = 'camera'"
-            >
-              <img src="/img/camera-svg.svg" alt="Камера" class="w-5 h-5" />
-              Камера
+            <button :class="['py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2', sc.scanMode === 'camera' ? 'bg-gradient-to-r from-purple-500 to-purple-700 text-white shadow-lg shadow-purple-500/30' : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700']" @click="sc.scanMode = 'camera'">
+              <img src="/img/camera-svg.svg" alt="Камера" class="w-5 h-5" /> Камера
             </button>
           </div>
         </div>
 
-        <!-- Режим сканирования -->
-        <div v-if="scanMode === 'tsd'" class="space-y-3 mt-4">
-          <Input
-            v-model="tsdInput"
-            placeholder="📱 Введите штрихкод и нажмите Enter"
-            :disabled="isProcessingTsd"
-            variant="primary"
-            size="large"
-            @keyup.enter="handleTsdInput()"
-          />
-          <p class="text-xs text-slate-400 mt-1 ml-2">
-            💡 Введите номер товара (например 45328) — префикс добавится автоматически
-          </p>
+        <div v-if="sc.scanMode === 'tsd'" class="space-y-3 mt-4">
+          <Input v-model="sc.tsdInput" placeholder="📱 Введите штрихкод и нажмите Enter" :disabled="sc.isProcessingTsd" variant="primary" size="large" @keyup.enter="sc.handleTsdInput(processScannedCode)" />
+          <p class="text-xs text-slate-400 mt-1 ml-2">💡 Введите номер товара (например 45328) — префикс добавится автоматически</p>
         </div>
 
-        <!-- Камера режим -->
-        <div v-if="scanMode === 'camera'" class="space-y-3">
-          <Button variant="primary" block @click="isScanning ? stopScanner() : startScanner()">
-            <van-icon :name="isScanning ? 'stop-circle-o' : 'scan'" size="20" />
-            {{ isScanning ? 'Сканирование...' : 'Старт' }}
+        <div v-if="sc.scanMode === 'camera'" class="space-y-3">
+          <Button variant="primary" block @click="sc.isScanning ? sc.stopScanner() : startScanner()">
+            <van-icon :name="sc.isScanning ? 'stop-circle-o' : 'scan'" size="20" />
+            {{ sc.isScanning ? 'Сканирование...' : 'Старт' }}
           </Button>
-          <p class="text-sm text-slate-500 mt-3 text-center">
-            📷 Нажмите «Старт» для сканирования одного кода
-          </p>
+          <p class="text-sm text-slate-500 mt-3 text-center">📷 Нажмите «Старт» для сканирования одного кода</p>
         </div>
       </div>
 
-      <!-- Секция: Готовые миксы -->
       <div v-if="palletStore.currentPallet && isContainerOwner" class="mt-4">
         <div class="bg-slate-800/80 border border-slate-700 rounded-2xl overflow-hidden">
           <div class="p-4 border-b border-slate-700 flex items-center justify-between">
-            <h3 class="font-semibold text-slate-100 flex items-center gap-2">
-              <van-icon name="bag" class="text-primary-400" />
-              Готовые миксы
-            </h3>
-            <button
-              class="text-primary-400 text-sm flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-700 transition-colors"
-              @click="loadAvailableMixes"
-            >
-              <van-icon name="replay" size="14" /> Обновить
-            </button>
+            <h3 class="font-semibold text-slate-100 flex items-center gap-2"><van-icon name="bag" class="text-primary-400" /> Готовые миксы</h3>
+            <button class="text-primary-400 text-sm flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-700 transition-colors" @click="loadAvailableMixes"><van-icon name="replay" size="14" /> Обновить</button>
           </div>
           <div class="p-4">
-            <div v-if="isLoadingMixes" class="text-center py-6">
-              <p class="text-slate-400 text-sm">Загрузка...</p>
-            </div>
-            <div v-else-if="availableMixes.length === 0" class="text-center py-6">
-              <p class="text-slate-500 text-sm">Нет завершённых миксов</p>
-            </div>
+            <div v-if="isLoadingMixes" class="text-center py-6"><p class="text-slate-400 text-sm">Загрузка...</p></div>
+            <div v-else-if="availableMixes.length === 0" class="text-center py-6"><p class="text-slate-500 text-sm">Нет завершённых миксов</p></div>
             <div v-else class="space-y-2 max-h-64 overflow-y-auto">
-              <div
-                v-for="mix in availableMixes"
-                :key="mix.id"
-                class="flex items-center justify-between p-3 bg-slate-700/80 rounded-xl"
-              >
+              <div v-for="mix in availableMixes" :key="mix.id" class="flex items-center justify-between p-3 bg-slate-700/80 rounded-xl">
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm font-semibold text-slate-100 truncate">
-                    Микс #{{ mix.number }}
-                  </p>
+                  <p class="text-sm font-semibold text-slate-100 truncate">Микс #{{ mix.number }}</p>
                   <p class="text-xs text-slate-400">{{ mix.name }}</p>
                 </div>
-                <button
-                  class="ml-3 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-lg transition-colors flex-shrink-0"
-                  @click="addMixToPallet(mix)"
-                >
-                  + Добавить
-                </button>
+                <button class="ml-3 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-lg transition-colors flex-shrink-0" @click="addMixToPallet(mix)">+ Добавить</button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Список товаров -->
-      <div
-        v-if="palletStore.currentPallet"
-        class="bg-slate-800/80 border border-slate-700 rounded-2xl overflow-hidden"
-      >
+      <div v-if="palletStore.currentPallet" class="bg-slate-800/80 border border-slate-700 rounded-2xl overflow-hidden">
         <div class="p-4 border-b border-slate-700 flex items-center justify-between">
-          <h3 class="font-semibold text-slate-100 flex items-center gap-2">
-            <van-icon name="bag-o" class="text-primary-400" />
-            Товары в паллете ({{ palletStore.currentPallet?.items?.length || 0 }})
-          </h3>
-          <button
-            class="text-primary-400 text-sm flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-700 transition-colors"
-            @click="refreshPalletItems"
-          >
-            <van-icon name="replay" size="14" /> Обновить
-          </button>
+          <h3 class="font-semibold text-slate-100 flex items-center gap-2"><van-icon name="bag-o" class="text-primary-400" /> Товары в паллете ({{ palletStore.currentPallet?.items?.length || 0 }})</h3>
+          <button class="text-primary-400 text-sm flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-700 transition-colors" @click="refreshPalletItems"><van-icon name="replay" size="14" /> Обновить</button>
         </div>
         <div class="p-4">
-          <!-- Для паллета: показываем separate items с полными данными -->
           <div v-if="palletItemsWithDetails.length === 0" class="text-center py-8">
-            <div
-              class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-3"
-            >
-              <van-icon name="bag-o" size="32" color="#64748b" />
-            </div>
+            <div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-3"><van-icon name="bag-o" size="32" color="#64748b" /></div>
             <p class="text-slate-500 text-sm">Пока нет товаров. Отсканируйте штрихкод.</p>
           </div>
           <div v-else class="items-list-detail space-y-2 max-h-72 overflow-y-auto scrollbar-thin">
-            <div
-              v-for="(item, index) in palletItemsWithDetails"
-              :key="index"
-              class="item-row p-3 rounded-xl transition-all duration-200 relative"
-              :class="
-                index === 0
-                  ? 'bg-emerald-500/15 border-2 border-emerald-400 item-new-glow overflow-visible'
-                  : 'bg-slate-700/80 hover:bg-slate-600'
-              "
-            >
+            <div v-for="(item, index) in palletItemsWithDetails" :key="index" class="item-row p-3 rounded-xl transition-all duration-200 relative" :class="index === 0 ? 'bg-emerald-500/15 border-2 border-emerald-400 item-new-glow overflow-visible' : 'bg-slate-700/80 hover:bg-slate-600'">
               <div v-if="index === 0" class="new-badge absolute top-[4px] right-3 z-10">NEW</div>
               <div class="flex items-center gap-3">
-                <div
-                  class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0"
-                >
-                  <span class="text-xs font-bold text-emerald-400">{{ index + 1 }}</span>
-                </div>
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-emerald-400">{{ index + 1 }}</span></div>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-semibold text-slate-100 truncate mb-1">{{ item.name }}</p>
                   <p class="text-xs text-slate-400 font-mono">{{ item.number || '—' }}</p>
                   <p v-if="item.article" class="text-xs text-slate-500 mt-1">{{ item.article }}</p>
                 </div>
-                <button
-                  v-if="isContainerOwner"
-                  class="w-8 h-8 rounded-lg bg-red-500/20 border border-red-500/30 flex items-center justify-center flex-shrink-0 hover:bg-red-500/40 transition-colors"
-                  @click="removeItem(item)"
-                >
-                  <van-icon name="delete-o" size="16" color="#ef4444" />
-                </button>
+                <button v-if="isContainerOwner" class="w-8 h-8 rounded-lg bg-red-500/20 border border-red-500/30 flex items-center justify-center flex-shrink-0 hover:bg-red-500/40 transition-colors" @click="removeItem(item)"><van-icon name="delete-o" size="16" color="#ef4444" /></button>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Кнопки действий -->
       <div v-if="palletStore.currentPallet && isContainerOwner" class="box-actions space-y-2">
         <div class="grid grid-cols-3 gap-2">
-          <Button
-            variant="secondary"
-            :disabled="!palletStore.canUndo"
-            class="custom-btn-secondary"
-            @click="performUndo()"
-          >
-            <svg
-              class="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-              />
-            </svg>
-            Отмена
+          <Button variant="secondary" :disabled="!palletStore.canUndo" class="custom-btn-secondary" @click="performUndo()">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg> Отмена
           </Button>
           <Button variant="danger" class="custom-btn-danger" @click="cancelPallet()">
-            <svg
-              class="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-            Сброс
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> Сброс
           </Button>
-          <Button
-            variant="success"
-            :disabled="(palletStore.currentPallet?.items || []).length === 0"
-            :class="(palletStore.currentPallet?.items || []).length === 0 ? 'opacity-50' : ''"
-            class="custom-btn-success"
-            @click="finishPallet()"
-          >
-            <svg
-              class="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-            Завершить паллет
+          <Button variant="success" :disabled="(palletStore.currentPallet?.items || []).length === 0" :class="(palletStore.currentPallet?.items || []).length === 0 ? 'opacity-50' : ''" class="custom-btn-success" @click="finishPallet()">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg> Завершить паллет
           </Button>
         </div>
       </div>
     </main>
 
-    <!-- Модальное окно сканера -->
-    <Modal
-      :model-value="showScanner"
-      confirm-text="Стоп"
-      confirm-color="danger"
-      @update:model-value="
-        (val) => {
-          showScanner = val
-          if (!val) stopScanner()
-        }
-      "
-      @confirm="handleStopScanner"
-    >
+    <Modal :model-value="showScanner" confirm-text="Стоп" confirm-color="danger" @update:model-value="(val) => { showScanner = val; if (!val) sc.stopScanner() }" @confirm="handleStopScanner">
       <div class="text-center mb-4">
         <h3 class="font-semibold text-slate-100 mb-1">📷 Сканирование штрихкода</h3>
         <p class="text-sm text-slate-400">Наведите камеру на штрихкод</p>
       </div>
       <div class="scanner-element rounded-2xl overflow-hidden mb-4 relative">
-        <div :id="scannerElementId" class="w-full"></div>
-        <!-- Сканирующая линия -->
+        <div :id="sc.scannerElementId" class="w-full"></div>
         <div class="scan-line"></div>
-        <!-- Рамка сканера -->
         <div class="scan-frame"></div>
       </div>
     </Modal>
 
-    <!-- Модальное окно стоп-товара -->
-    <Modal
-      v-model="showStopItemModal"
-      title="⛔ Стоп-товар!"
-      :show-cancel="false"
-      confirm-text="OK"
-      @confirm="showStopItemModal = false"
-    >
+    <Modal v-model="showStopItemModal" title="⛔ Стоп-товар!" :show-cancel="false" confirm-text="OK" @confirm="showStopItemModal = false">
       <div v-if="currentStopItem" class="text-left space-y-3">
-        <div>
-          <p class="text-xs text-slate-400 mb-1">Наименование</p>
-          <p class="text-slate-100 font-medium">{{ currentStopItem.name }}</p>
-        </div>
-        <div>
-          <p class="text-xs text-slate-400 mb-1">Номер</p>
-          <p class="text-slate-100 font-mono">{{ currentStopItem.number }}</p>
-        </div>
-        <div>
-          <p class="text-xs text-slate-400 mb-1">Комментарий</p>
-          <p class="text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-            {{ currentStopItem.comment || 'Нет комментария' }}
-          </p>
-        </div>
-        <p class="text-xs text-slate-500 mt-2">
-          Этот товар нельзя отгружать в брак. Обратитесь к руководству для уточнения.
-        </p>
+        <div><p class="text-xs text-slate-400 mb-1">Наименование</p><p class="text-slate-100 font-medium">{{ currentStopItem.name }}</p></div>
+        <div><p class="text-xs text-slate-400 mb-1">Номер</p><p class="text-slate-100 font-mono">{{ currentStopItem.number }}</p></div>
+        <div><p class="text-xs text-slate-400 mb-1">Комментарий</p><p class="text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">{{ currentStopItem.comment || 'Нет комментария' }}</p></div>
+        <p class="text-xs text-slate-500 mt-2">Этот товар нельзя отгружать в брак. Обратитесь к руководству для уточнения.</p>
       </div>
     </Modal>
 
-    <!-- Модальное окно удаления товара -->
-    <Modal
-      v-model="showRemoveModal"
-      title="Удалить товар?"
-      show-cancel
-      confirm-text="Удалить"
-      cancel-text="Отмена"
-      confirm-color="danger"
-      @confirm="confirmRemoveItem"
-    >
-      <p class="text-slate-400 text-center">
-        {{ removeItemRef?.name }} ({{ removeItemRef?.number }})
-      </p>
+    <Modal v-model="showRemoveModal" title="Удалить товар?" show-cancel confirm-text="Удалить" cancel-text="Отмена" confirm-color="danger" @confirm="confirmRemoveItem">
+      <p class="text-slate-400 text-center">{{ removeItemRef?.name }} ({{ removeItemRef?.number }})</p>
     </Modal>
 
-    <!-- Модальное окно подтверждения завершения -->
-    <Modal
-      v-model="showFinishModal"
-      :title="'Завершить паллет?'"
-      show-cancel
-      confirm-text="Да, завершить"
-      cancel-text="Отмена"
-      @confirm="confirmFinish()"
-    >
+    <Modal v-model="showFinishModal" :title="'Завершить паллет?'" show-cancel confirm-text="Да, завершить" cancel-text="Отмена" @confirm="confirmFinish()">
       <div class="text-left space-y-3 text-white">
         <p>Вы уверены что хотите завершить паллет?</p>
         <div class="bg-slate-800/50 rounded-lg p-4">
@@ -1028,99 +581,19 @@ function handleKeyDown(event) {
 </template>
 
 <style scoped>
-.custom-btn-secondary {
-  background: rgba(107, 114, 128, 0.2);
-  border-color: rgba(107, 114, 128, 0.3);
-}
-.custom-btn-danger {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  border-color: #dc2626;
-}
-.custom-btn-success {
-  background: linear-gradient(135deg, #10b981 0%, #059652 100%);
-  border-color: #059652;
-}
-
-.item-row:hover {
-  transform: translateX(4px);
-}
-
-.new-badge {
-  animation: badgePulse 1.5s ease-in-out infinite;
-  background: #10b981;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 4px;
-  line-height: 1.4;
-}
-
-@keyframes badgePulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
-}
-
-.scrollbar-thin::-webkit-scrollbar {
-  width: 4px;
-}
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-}
-
-.pallet-view {
-  min-height: 100vh;
-}
-
-main {
-  flex: 1;
-}
-
-/* Сканирующая рамка с анимированной линией */
-.scanner-element {
-  position: relative;
-  min-height: 250px;
-  background: #0f172a;
-}
-
-.scan-frame {
-  position: absolute;
-  inset: 10%;
-  border: 3px solid rgba(236, 72, 153, 0.8);
-  border-radius: 16px;
-  pointer-events: none;
-  z-index: 10;
-  box-shadow: 0 0 15px rgba(236, 72, 153, 0.3);
-}
-
-.scan-line {
-  position: absolute;
-  left: 10%;
-  right: 10%;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, #ec4899, transparent);
-  z-index: 11;
-  animation: scan 2s ease-in-out infinite;
-  box-shadow: 0 0 15px rgba(236, 72, 153, 0.6);
-}
-
-@keyframes scan {
-  0%,
-  100% {
-    top: 20%;
-  }
-  50% {
-    top: 78%;
-  }
-}
+.custom-btn-secondary { background: rgba(107, 114, 128, 0.2); border-color: rgba(107, 114, 128, 0.3); }
+.custom-btn-danger { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-color: #dc2626; }
+.custom-btn-success { background: linear-gradient(135deg, #10b981 0%, #059652 100%); border-color: #059652; }
+.item-row:hover { transform: translateX(4px); }
+.new-badge { animation: badgePulse 1.5s ease-in-out infinite; background: #10b981; color: #fff; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; line-height: 1.4; }
+@keyframes badgePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+.scrollbar-thin::-webkit-scrollbar { width: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 8px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 8px; }
+.pallet-view { min-height: 100vh; }
+main { flex: 1; }
+.scanner-element { position: relative; min-height: 250px; background: #0f172a; }
+.scan-frame { position: absolute; inset: 10%; border: 3px solid rgba(236, 72, 153, 0.8); border-radius: 16px; pointer-events: none; z-index: 10; box-shadow: 0 0 15px rgba(236, 72, 153, 0.3); }
+.scan-line { position: absolute; left: 10%; right: 10%; height: 3px; background: linear-gradient(90deg, transparent, #ec4899, transparent); z-index: 11; animation: scan 2s ease-in-out infinite; box-shadow: 0 0 15px rgba(236, 72, 153, 0.6); }
+@keyframes scan { 0%, 100% { top: 20%; } 50% { top: 78%; } }
 </style>
