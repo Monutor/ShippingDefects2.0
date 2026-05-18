@@ -18,12 +18,17 @@ const filteredItems = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
   if (!query) return brainStore.items
 
-  return brainStore.items.filter(item => {
+  return brainStore.items.filter((item) => {
     const number = String(item.number || '').toLowerCase()
     const name = String(item.name || '').toLowerCase()
     const article = String(item.article || '').toLowerCase()
     const comment = String(item.comment || '').toLowerCase()
-    return number.includes(query) || name.includes(query) || article.includes(query) || comment.includes(query)
+    return (
+      number.includes(query) ||
+      name.includes(query) ||
+      article.includes(query) ||
+      comment.includes(query)
+    )
   })
 })
 
@@ -38,9 +43,12 @@ const totalPages = computed(() => {
 })
 
 // Сброс страницы при изменении поиска
-watch(() => searchQuery.value, () => {
-  currentPage.value = 1
-})
+watch(
+  () => searchQuery.value,
+  () => {
+    currentPage.value = 1
+  }
+)
 
 // Генерация кнопок пагинации для мобильных (максимум 5 видимых)
 const pageButtons = computed(() => {
@@ -104,7 +112,9 @@ function goToPage(page) {
 }
 
 function isStopItem(item) {
-  const comment = String(item.comment || '').trim().toLowerCase()
+  const comment = String(item.comment || '')
+    .trim()
+    .toLowerCase()
   if (comment === '') return true
   if (comment.includes('не согласован')) return true
   if (comment.includes('ждем согласования')) return true
@@ -114,19 +124,18 @@ function isStopItem(item) {
 </script>
 
 <template>
-  <div class="upload-view min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 pb-20">
+  <div
+    class="upload-view min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 pb-20"
+  >
     <!-- Nav Bar -->
-    <NavBar
-      title="База данных"
-      left-text="Назад"
-      left-arrow
-      @click-left="$router.back()"
-    />
+    <NavBar title="База данных" left-text="Назад" left-arrow @click-left="$router.back()" />
 
     <main class="content px-4 py-4">
       <!-- Пустое состояние -->
       <div v-if="!brainStore.hasDatabase" class="empty-state py-16">
-        <div class="w-24 h-24 rounded-full bg-gradient-to-br from-primary-500/20 to-primary-700/20 flex items-center justify-center mx-auto mb-6 border-2 border-primary-500/30">
+        <div
+          class="w-24 h-24 rounded-full bg-gradient-to-br from-primary-500/20 to-primary-700/20 flex items-center justify-center mx-auto mb-6 border-2 border-primary-500/30"
+        >
           <span class="text-5xl">📄</span>
         </div>
         <h3 class="text-lg font-semibold text-slate-100 mb-2">База данных не загружена</h3>
@@ -143,17 +152,25 @@ function isStopItem(item) {
               <h3 class="font-semibold text-slate-100">Текущая база</h3>
               <p class="text-sm text-slate-400 mt-1">{{ brainStore.totalItems }} товаров</p>
             </div>
-            <div class="text-sm text-slate-400">
-              Страница {{ currentPage }} из {{ totalPages }}
-            </div>
+            <div class="text-sm text-slate-400">Страница {{ currentPage }} из {{ totalPages }}</div>
           </div>
         </div>
 
         <!-- Поиск -->
         <div class="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl p-4 mb-4">
           <div class="flex items-center gap-3">
-            <svg class="w-5 h-5 text-slate-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <svg
+              class="w-5 h-5 text-slate-500 flex-shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
             <input
               v-model="searchQuery"
@@ -163,11 +180,16 @@ function isStopItem(item) {
             />
             <button
               v-if="searchQuery"
-              @click="searchQuery = ''"
               class="w-6 h-6 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors flex-shrink-0"
+              @click="searchQuery = ''"
             >
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -175,14 +197,14 @@ function isStopItem(item) {
             <template v-if="searchQuery">
               Найдено: {{ filteredTotal }} из {{ brainStore.totalItems }}
             </template>
-            <template v-else>
-              Всего: {{ brainStore.totalItems }} товаров
-            </template>
+            <template v-else> Всего: {{ brainStore.totalItems }} товаров </template>
           </div>
         </div>
 
         <!-- Таблица товаров -->
-        <div class="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl overflow-hidden">
+        <div
+          class="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl overflow-hidden"
+        >
           <div class="preview-table rounded-xl border border-slate-700 overflow-hidden">
             <div class="table-header">
               <span class="th-number">Номер</span>
@@ -212,8 +234,8 @@ function isStopItem(item) {
             size="sm"
             variant="secondary"
             :disabled="currentPage === 1"
-            @click="goToPage(currentPage - 1)"
             class="custom-btn-secondary"
+            @click="goToPage(currentPage - 1)"
           >
             Назад
           </Button>
@@ -230,15 +252,17 @@ function isStopItem(item) {
                 currentPage === btn ? 'active' : ''
               ]"
               @click="btn > 0 && goToPage(btn)"
-            >{{ btn < 0 ? '…' : btn }}</button>
+            >
+              {{ btn < 0 ? '…' : btn }}
+            </button>
           </div>
 
           <Button
             size="sm"
             variant="secondary"
             :disabled="currentPage === totalPages"
-            @click="goToPage(currentPage + 1)"
             class="custom-btn-secondary"
+            @click="goToPage(currentPage + 1)"
           >
             Вперёд
           </Button>

@@ -6,7 +6,7 @@ let _maintenanceMode = false
 let _maintenanceLoading = true
 
 /** Вызов из maintenance store при получении SSE init/maintenance_mode_changed */
-window.__setMaintenanceMode = function(enabled, loading = false) {
+window.__setMaintenanceMode = function (enabled, loading = false) {
   _maintenanceMode = enabled
   _maintenanceLoading = loading
 }
@@ -23,7 +23,7 @@ const router = createRouter({
       path: '/upload',
       name: 'upload',
       component: () => import('@/views/UploadView.vue'),
-      props: route => ({
+      props: (route) => ({
         key: Date.now(), // Принудительная перерисовка при каждом заходе
         timestamp: Date.now()
       })

@@ -33,14 +33,14 @@ app.component('VanIcon', Icon)
 // Очистка кэша Service Worker (ТОЛЬКО для разработки)
 // ============================================
 if ('serviceWorker' in navigator && import.meta.env.DEV) {
-  caches.keys().then(cacheNames => {
-    cacheNames.forEach(cacheName => {
+  caches.keys().then((cacheNames) => {
+    cacheNames.forEach((cacheName) => {
       caches.delete(cacheName)
     })
   })
 
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    registrations.forEach(registration => {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => {
       registration.unregister()
     })
   })
@@ -118,7 +118,11 @@ async function initializeApp() {
 
   // Если критические загрузки провалились — показываем предупреждение пользователю
   if (criticalFailures.length > 0) {
-    window.showToast(`⚠️ Не удалось загрузить: ${criticalFailures.join(', ')}. Данные будут загружены позже.`, 10000, 'warning')
+    window.showToast(
+      `⚠️ Не удалось загрузить: ${criticalFailures.join(', ')}. Данные будут загружены позже.`,
+      10000,
+      'warning'
+    )
   }
 
   // Периодическая синхронизация активного короба (каждые 5 минут)
@@ -132,7 +136,9 @@ async function initializeApp() {
 
   // Очистка интервала при logout (храним глобально для доступа из App.vue)
   window._appCleanup = {
-    syncInterval: () => { if (syncIntervalId) clearInterval(syncIntervalId) }
+    syncInterval: () => {
+      if (syncIntervalId) clearInterval(syncIntervalId)
+    }
   }
 }
 
@@ -152,7 +158,9 @@ if (redirectPath) {
   sessionStorage.removeItem('redirect_path')
   // Remove base path prefix if present
   const basePath = '/ShippingDefects2.0'
-  const path = redirectPath.startsWith(basePath) ? redirectPath.slice(basePath.length) : redirectPath
+  const path = redirectPath.startsWith(basePath)
+    ? redirectPath.slice(basePath.length)
+    : redirectPath
   router.replace(path || '/')
 }
 

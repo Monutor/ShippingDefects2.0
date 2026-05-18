@@ -75,9 +75,11 @@ function handleOverlayClick() {
             </button>
             <button
               class="flex-1 py-4 font-semibold transition-colors last:rounded-br-3xl"
-              :class="confirmColor === 'danger'
-                ? 'bg-rose-600 hover:bg-rose-500 text-white'
-                : 'bg-primary-600 hover:bg-primary-500 text-white'"
+              :class="
+                confirmColor === 'danger'
+                  ? 'bg-rose-600 hover:bg-rose-500 text-white'
+                  : 'bg-primary-600 hover:bg-primary-500 text-white'
+              "
               @click="handleConfirm"
             >
               {{ confirmText }}

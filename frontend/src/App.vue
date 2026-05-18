@@ -54,14 +54,15 @@ onUnmounted(() => {
 <template>
   <div id="app">
     <!-- Offline banner -->
-    <div v-if="isOffline" class="offline-banner fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-white text-center py-2 text-sm font-medium shadow-lg">
+    <div
+      v-if="isOffline"
+      class="offline-banner fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-white text-center py-2 text-sm font-medium shadow-lg"
+    >
       ⚠️ Нет подключения к сети — данные сохраняются локально
     </div>
 
     <!-- Режим тех.работ -->
-    <MaintenanceMode
-      v-if="maintenanceStore.isEnabled && !isUserAdmin && !isLoginPage"
-    />
+    <MaintenanceMode v-if="maintenanceStore.isEnabled && !isUserAdmin && !isLoginPage" />
 
     <!-- Обычный режим или админ видит приложение, или страница логина -->
     <template v-else>

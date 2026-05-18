@@ -37,7 +37,9 @@ export const useCollectorStore = defineStore('collector', () => {
         })
         return true
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return false
   }
 

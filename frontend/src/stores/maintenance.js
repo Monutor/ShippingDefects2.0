@@ -29,8 +29,7 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
           isEnabled.value = result.data.maintenance_mode === true || result.data.value === 'true'
           serverLoaded = true
         }
-      } catch (err) {
-      }
+      } catch (err) {}
     }
 
     // Убрали localStorage fallback — если сервер не ответил, conservative default = false
@@ -47,8 +46,7 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
     if (navigator.onLine) {
       try {
         await mApi.save(isEnabled.value)
-      } catch (err) {
-      }
+      } catch (err) {}
     } else {
     }
   }
@@ -78,10 +76,8 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
         }
       })
 
-      eventSource.onerror = () => {
-      }
-    } catch (err) {
-    }
+      eventSource.onerror = () => {}
+    } catch (err) {}
   }
 
   /** Отписка от realtime */

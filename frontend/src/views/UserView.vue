@@ -66,16 +66,15 @@ async function loadStats() {
         db.pallets.getAll()
       ])
       if (!boxesResult.error && boxesResult.data?.length) {
-        stats.value.totalBoxes = boxesResult.data.filter(b => b.status === 'finished').length
+        stats.value.totalBoxes = boxesResult.data.filter((b) => b.status === 'finished').length
       }
       if (!separateResult.error && separateResult.data?.length) {
         stats.value.totalSeparateItems = separateResult.data.length
       }
       if (!palletsResult.error && palletsResult.data?.length) {
-        stats.value.totalPallets = palletsResult.data.filter(p => p.status === 'finished').length
+        stats.value.totalPallets = palletsResult.data.filter((p) => p.status === 'finished').length
       }
-    } catch (err) {
-    }
+    } catch (err) {}
   }
 }
 
@@ -102,14 +101,17 @@ async function saveProfile() {
   const existingUser = JSON.parse(localStorage.getItem('warehouse-brain-user') || '{}')
   const savedToken = existingUser.token || null
 
-  localStorage.setItem('warehouse-brain-user', JSON.stringify({
-    employeeId: collectorStore.employeeId,
-    fullName: editForm.value.fullName.trim(),
-    position: editForm.value.position.trim() || 'Сборщик',
-    is_admin: existingUser.is_admin || false,
-    token: savedToken,
-    authenticatedAt: new Date().toISOString()
-  }))
+  localStorage.setItem(
+    'warehouse-brain-user',
+    JSON.stringify({
+      employeeId: collectorStore.employeeId,
+      fullName: editForm.value.fullName.trim(),
+      position: editForm.value.position.trim() || 'Сборщик',
+      is_admin: existingUser.is_admin || false,
+      token: savedToken,
+      authenticatedAt: new Date().toISOString()
+    })
+  )
 
   // Синхронизация профиля с бэкендом (прямой PUT)
   try {
@@ -117,8 +119,7 @@ async function saveProfile() {
       fullName: editForm.value.fullName.trim(),
       position: editForm.value.position.trim() || 'Сборщик'
     })
-  } catch (error) {
-  }
+  } catch (error) {}
 
   // Закрываем модалку после сохранения
   showEditModal.value = false
@@ -232,47 +233,76 @@ const initials = computed(() => {
     <div v-if="!isAuthenticated" class="not-authenticated-card">
       <div class="auth-icon">
         <svg class="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="1.5"
+            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+          />
         </svg>
       </div>
 
       <h2 class="auth-title">Вход в систему</h2>
       <p class="auth-description">
-        Войдите по табельному номеру, чтобы получить доступ к синхронизации данных и статистике работы
+        Войдите по табельному номеру, чтобы получить доступ к синхронизации данных и статистике
+        работы
       </p>
 
       <ul class="auth-features">
         <li>
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M5 13l4 4L19 7"
+            />
           </svg>
           Синхронизация между устройствами
         </li>
         <li>
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M5 13l4 4L19 7"
+            />
           </svg>
           Сохранение истории сканирований
         </li>
         <li>
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M5 13l4 4L19 7"
+            />
           </svg>
           Статистика работы
         </li>
         <li>
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M5 13l4 4L19 7"
+            />
           </svg>
           Работа с сервером
         </li>
       </ul>
 
-      <Button @click="router.push('/login')" class="login-button">
+      <Button class="login-button" @click="router.push('/login')">
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
+          />
         </svg>
         Войти по табельному номеру
       </Button>
@@ -288,7 +318,7 @@ const initials = computed(() => {
           </div>
 
           <div class="badge-photo-area">
-            <img class="company-logo" src='/img/mvideo-1.svg' alt="logo company" width="150" />
+            <img class="company-logo" src="/img/mvideo-1.svg" alt="logo company" width="150" />
           </div>
 
           <div class="badge-content">
@@ -327,18 +357,26 @@ const initials = computed(() => {
         </div>
 
         <div class="profile-actions">
-          <Button variant="secondary" @click="openEditModal" class="action-btn">
+          <Button variant="secondary" class="action-btn" @click="openEditModal">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
             </svg>
             Редактировать
           </Button>
 
-          <Button variant="danger" @click="handleLogout" class="action-btn">
+          <Button variant="danger" class="action-btn" @click="handleLogout">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
             </svg>
             Выйти
           </Button>
@@ -350,33 +388,50 @@ const initials = computed(() => {
         <div class="maintenance-header">
           <div class="maintenance-icon-wrapper">
             <svg class="maintenance-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+              />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
             </svg>
           </div>
           <div class="maintenance-title-wrapper">
             <h3 class="maintenance-title">Режим технических работ</h3>
-            <p class="maintenance-description">
-              При включении все пользователи увидят заглушку
-            </p>
+            <p class="maintenance-description">При включении все пользователи увидят заглушку</p>
           </div>
         </div>
 
         <div class="maintenance-control">
           <button
-            @click="maintenanceStore.toggleMaintenance()"
             :class="['toggle-switch', maintenanceStore.isEnabled ? 'toggle-on' : 'toggle-off']"
             :disabled="maintenanceStore.isLoading"
+            @click="maintenanceStore.toggleMaintenance()"
           >
             <span class="toggle-handle"></span>
           </button>
           <span :class="['toggle-status', maintenanceStore.isEnabled ? 'status-on' : 'status-off']">
             <template v-if="maintenanceStore.isLoading">
               <svg class="loading-spinner" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
               </svg>
               Загрузка...
             </template>
@@ -386,10 +441,17 @@ const initials = computed(() => {
           </span>
         </div>
 
-        <div v-if="maintenanceStore.isEnabled && !maintenanceStore.isLoading" class="maintenance-warning">
+        <div
+          v-if="maintenanceStore.isEnabled && !maintenanceStore.isLoading"
+          class="maintenance-warning"
+        >
           <svg class="warning-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+            />
           </svg>
           <span>Сейчас все пользователи видят страницу "Ведутся технические работы"</span>
         </div>
@@ -399,26 +461,36 @@ const initials = computed(() => {
       <div v-if="isUserAdmin" class="admin-clear-section">
         <div class="admin-clear-card">
           <div class="admin-clear-header">
-          <div class="admin-clear-icon-wrapper">
-            <svg class="admin-clear-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M8 11h8M8 15h6M12 3v4" />
-            </svg>
+            <div class="admin-clear-icon-wrapper">
+              <svg class="admin-clear-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3z"
+                />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M8 11h8M8 15h6M12 3v4"
+                />
+              </svg>
             </div>
             <div class="admin-clear-title-wrapper">
               <h3 class="admin-clear-title">Очистка БД</h3>
-              <p class="admin-clear-description">
-                Удалить базу брака (товары)
-              </p>
+              <p class="admin-clear-description">Удалить базу брака (товары)</p>
             </div>
           </div>
           <div class="admin-clear-control">
-            <Button variant="danger" @click="clearBrainDatabase" class="admin-clear-btn">
+            <Button variant="danger" class="admin-clear-btn" @click="clearBrainDatabase">
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
               </svg>
               Очистка БД
             </Button>
@@ -429,22 +501,28 @@ const initials = computed(() => {
           <div class="admin-clear-header">
             <div class="admin-clear-icon-wrapper">
               <svg class="admin-clear-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                />
               </svg>
             </div>
             <div class="admin-clear-title-wrapper">
               <h3 class="admin-clear-title">Паллеты и миксы</h3>
-              <p class="admin-clear-description">
-                Удалить паллеты, короба и товары
-              </p>
+              <p class="admin-clear-description">Удалить паллеты, короба и товары</p>
             </div>
           </div>
           <div class="admin-clear-control">
-            <Button variant="danger" @click="clearAllData" class="admin-clear-btn">
+            <Button variant="danger" class="admin-clear-btn" @click="clearAllData">
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
               </svg>
               Очистить всё
             </Button>
@@ -460,8 +538,12 @@ const initials = computed(() => {
           <div class="stat-card">
             <div class="stat-icon bg-green-500">
               <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                />
               </svg>
             </div>
             <div class="stat-info">
@@ -473,8 +555,12 @@ const initials = computed(() => {
           <div class="stat-card">
             <div class="stat-icon bg-purple-500">
               <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                />
               </svg>
             </div>
             <div class="stat-info">
@@ -486,8 +572,12 @@ const initials = computed(() => {
           <div class="stat-card">
             <div class="stat-icon bg-blue-500">
               <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+                />
               </svg>
             </div>
             <div class="stat-info">
@@ -509,7 +599,12 @@ const initials = computed(() => {
       <div class="edit-form">
         <div class="form-group">
           <label for="edit-fullname">ФИО</label>
-          <Input id="edit-fullname" v-model="editForm.fullName" type="text" placeholder="Иванов Иван Иванович" />
+          <Input
+            id="edit-fullname"
+            v-model="editForm.fullName"
+            type="text"
+            placeholder="Иванов Иван Иванович"
+          />
         </div>
 
         <div class="form-group">
@@ -773,19 +868,21 @@ const initials = computed(() => {
 .barcode {
   height: 24px;
   margin: 0 auto 0.5rem;
-  background: repeating-linear-gradient(90deg,
-      #1e293b 0px,
-      #1e293b 2px,
-      transparent 2px,
-      transparent 4px,
-      #1e293b 4px,
-      #1e293b 5px,
-      transparent 5px,
-      transparent 7px,
-      #1e293b 7px,
-      #1e293b 9px,
-      transparent 9px,
-      transparent 11px);
+  background: repeating-linear-gradient(
+    90deg,
+    #1e293b 0px,
+    #1e293b 2px,
+    transparent 2px,
+    transparent 4px,
+    #1e293b 4px,
+    #1e293b 5px,
+    transparent 5px,
+    transparent 7px,
+    #1e293b 7px,
+    #1e293b 9px,
+    transparent 9px,
+    transparent 11px
+  );
   width: 80%;
   max-width: 200px;
 }

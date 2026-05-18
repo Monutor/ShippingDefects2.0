@@ -20,12 +20,32 @@ const activeIndex = computed(() => {
 
 const items = [
   { icon: `${import.meta.env.BASE_URL}img/navIcons/home-icon.svg`, text: 'Главная', path: '/' },
-  { icon: `${import.meta.env.BASE_URL}img/navIcons/database-svg.svg`, text: 'База данных', path: '/upload' },
+  {
+    icon: `${import.meta.env.BASE_URL}img/navIcons/database-svg.svg`,
+    text: 'База данных',
+    path: '/upload'
+  },
   { icon: `${import.meta.env.BASE_URL}img/navIcons/box-svg.svg`, text: 'Миксы', path: '/mix-view' },
-  { icon: `${import.meta.env.BASE_URL}img/navIcons/pallet-icon.svg`, text: 'Паллеты', path: '/pallet-view' },
-  { icon: `${import.meta.env.BASE_URL}img/navIcons/truck-svg.svg`, text: 'Отдельные', path: '/separate' },
-  { icon: `${import.meta.env.BASE_URL}img/navIcons/result-icon.svg`, text: 'Результаты', path: '/boxes' },
-  { icon: `${import.meta.env.BASE_URL}img/navIcons/profile-icon.svg`, text: 'Профиль', path: '/user' }
+  {
+    icon: `${import.meta.env.BASE_URL}img/navIcons/pallet-icon.svg`,
+    text: 'Паллеты',
+    path: '/pallet-view'
+  },
+  {
+    icon: `${import.meta.env.BASE_URL}img/navIcons/truck-svg.svg`,
+    text: 'Отдельные',
+    path: '/separate'
+  },
+  {
+    icon: `${import.meta.env.BASE_URL}img/navIcons/result-icon.svg`,
+    text: 'Результаты',
+    path: '/boxes'
+  },
+  {
+    icon: `${import.meta.env.BASE_URL}img/navIcons/profile-icon.svg`,
+    text: 'Профиль',
+    path: '/user'
+  }
 ]
 
 function handleItemClick(index, path) {

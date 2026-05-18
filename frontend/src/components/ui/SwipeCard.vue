@@ -46,8 +46,13 @@ function handleDelete() {
 <template>
   <div class="relative overflow-hidden rounded-2xl mb-3">
     <!-- Background action -->
-    <div class="absolute right-0 top-0 bottom-0 w-20 bg-rose-600 flex items-center justify-center rounded-r-2xl">
-      <button class="w-full h-full flex items-center justify-center text-white" @click="handleDelete">
+    <div
+      class="absolute right-0 top-0 bottom-0 w-20 bg-rose-600 flex items-center justify-center rounded-r-2xl"
+    >
+      <button
+        class="w-full h-full flex items-center justify-center text-white"
+        @click="handleDelete"
+      >
         <van-icon name="delete-o" size="20" />
       </button>
     </div>

@@ -18,7 +18,7 @@ const tabTitles = ref([])
 /** Вызывается каждым Tab при монтировании */
 function registerTab(index, initialTitle) {
   const titleRef = ref(typeof initialTitle === 'function' ? initialTitle() : String(initialTitle))
-  
+
   if (index >= tabTitles.value.length) {
     while (tabTitles.value.length <= index) {
       tabTitles.value.push(null)
@@ -29,7 +29,7 @@ function registerTab(index, initialTitle) {
     updated[index] = titleRef
     tabTitles.value = updated
   }
-  
+
   return {
     set(title) {
       titleRef.value = typeof title === 'function' ? title() : String(title)
@@ -43,7 +43,9 @@ defineExpose({ registerTab })
 <template>
   <div class="w-full mt-2">
     <!-- Tab Headers -->
-    <div class="flex items-center bg-slate-800/80 backdrop-blur-sm border-b border-slate-700 rounded-t-2xl">
+    <div
+      class="flex items-center bg-slate-800/80 backdrop-blur-sm border-b border-slate-700 rounded-t-2xl"
+    >
       <button
         v-for="(title, index) in tabTitles"
         :key="index"

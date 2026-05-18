@@ -41,7 +41,9 @@ async function handleFileSelect(file) {
     // Автомаппинг колонок
     const mapping = autoMapColumns(headers)
     if (!mapping) {
-      throw new Error('Не удалось определить колонку "номер" в файле. Убедитесь, что в первой строке есть колонка с заголовком "номер" или "номер этикетки".')
+      throw new Error(
+        'Не удалось определить колонку "номер" в файле. Убедитесь, что в первой строке есть колонка с заголовком "номер" или "номер этикетки".'
+      )
     }
 
     // Сохраняем базу
@@ -62,41 +64,41 @@ async function handleFileSelect(file) {
 }
 
 function autoMapColumns(headers) {
-  const lowerHeaders = headers.map(h => h.toLowerCase())
+  const lowerHeaders = headers.map((h) => h.toLowerCase())
 
-  let numberIndex = lowerHeaders.findIndex(h => h === 'номер')
+  let numberIndex = lowerHeaders.findIndex((h) => h === 'номер')
   if (numberIndex === -1) {
-    numberIndex = lowerHeaders.findIndex(h =>
-      ['номер этикетки', 'number', 'номер брака'].some(kw => h.includes(kw))
+    numberIndex = lowerHeaders.findIndex((h) =>
+      ['номер этикетки', 'number', 'номер брака'].some((kw) => h.includes(kw))
     )
   }
-  
+
   // Если не нашли колонку номера — не фоллбачим на headers[0], а возвращаем null
   if (numberIndex === -1) {
     return null
   }
 
-  let nameIndex = lowerHeaders.findIndex(h => h === 'наименование')
+  let nameIndex = lowerHeaders.findIndex((h) => h === 'наименование')
   if (nameIndex === -1) {
-    nameIndex = lowerHeaders.findIndex(h =>
-      ['название', 'товар', 'product', 'описание', 'наименование товара'].some(kw => h.includes(kw))
+    nameIndex = lowerHeaders.findIndex((h) =>
+      ['название', 'товар', 'product', 'описание', 'наименование товара'].some((kw) =>
+        h.includes(kw)
+      )
     )
   }
 
-  let articleIndex = lowerHeaders.findIndex(h =>
-    ['код товара', 'артикул', 'sku', 'code'].some(kw => h.includes(kw))
+  let articleIndex = lowerHeaders.findIndex((h) =>
+    ['код товара', 'артикул', 'sku', 'code'].some((kw) => h.includes(kw))
   )
 
   const commentKeywords = ['комментарий', 'comment', 'примечание', 'note', 'замечание']
-  const commentIndex = lowerHeaders.findIndex(h =>
-    commentKeywords.some(kw => h.includes(kw))
-  )
+  const commentIndex = lowerHeaders.findIndex((h) => commentKeywords.some((kw) => h.includes(kw)))
 
   return {
     barcode: '',
     // L5: name fallback на headers[4] || headers[0] — работает для стандартных Excel файлов.
     // Если формат специфичный → пользователь должен вручную маппить колонки в UI
-    name: nameIndex !== -1 ? headers[nameIndex] : (headers[4] || headers[0]),
+    name: nameIndex !== -1 ? headers[nameIndex] : headers[4] || headers[0],
     article: articleIndex !== -1 ? headers[articleIndex] : '',
     number: numberIndex !== -1 ? headers[numberIndex] : headers[0],
     comment: commentIndex !== -1 ? headers[commentIndex] : ''
@@ -121,11 +123,7 @@ function autoMapColumns(headers) {
 
     <!-- Загрузка файла -->
     <div class="upload-section">
-      <FileUpload
-        accept=".xlsx,.xls"
-        :loading="isLoading"
-        @change="handleFileSelect"
-      />
+      <FileUpload accept=".xlsx,.xls" :loading="isLoading" @change="handleFileSelect" />
 
       <!-- Ошибка -->
       <div v-if="error" class="error-message">

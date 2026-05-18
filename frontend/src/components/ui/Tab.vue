@@ -12,7 +12,7 @@ const registerTab = inject('registerTab', null)
 // Регистрируем заголово у родителя и следим за изменениями
 if (registerTab) {
   const registration = registerTab(tabIndex.value, () => String(props.title))
-  
+
   // При изменении props.title — обновляем заголово в родителе
   watchEffect(() => {
     if (props.title !== undefined && registration?.set) {
@@ -21,7 +21,10 @@ if (registerTab) {
   })
 }
 
-const activeTab = inject('activeTab', computed(() => 0))
+const activeTab = inject(
+  'activeTab',
+  computed(() => 0)
+)
 const isActive = computed(() => activeTab.value === tabIndex.value)
 </script>
 

@@ -9,7 +9,7 @@ const props = defineProps({
   disabled: Boolean,
   readonly: Boolean,
   clearable: Boolean,
-  icon: [Boolean, String]  // Поддерживаем и boolean, и строку (название иконки)
+  icon: [Boolean, String] // Поддерживаем и boolean, и строку (название иконки)
 })
 
 const emit = defineEmits(['update:modelValue', 'keyup', 'change', 'blur', 'click'])

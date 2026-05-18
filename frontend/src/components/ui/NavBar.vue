@@ -14,11 +14,7 @@ defineEmits(['click-left', 'click-right'])
     <div class="nav-bar-content">
       <!-- Left -->
       <div class="nav-bar-left">
-        <button
-          v-if="leftArrow || leftText"
-          class="nav-bar-button"
-          @click="$emit('click-left')"
-        >
+        <button v-if="leftArrow || leftText" class="nav-bar-button" @click="$emit('click-left')">
           <van-icon v-if="leftArrow" name="arrow-left" size="16" />
           <span v-if="leftText" class="nav-bar-button-text">{{ leftText }}</span>
         </button>
@@ -31,11 +27,7 @@ defineEmits(['click-left', 'click-right'])
 
       <!-- Right -->
       <div class="nav-bar-right">
-        <button
-          v-if="rightText"
-          class="nav-bar-button-text"
-          @click="$emit('click-right')"
-        >
+        <button v-if="rightText" class="nav-bar-button-text" @click="$emit('click-right')">
           {{ rightText }}
         </button>
         <slot name="right" />

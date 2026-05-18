@@ -49,9 +49,8 @@ export const useSeparateStore = defineStore('separate', () => {
       const result = await db.separateItems.getAll()
       if (result.error) return []
 
-      const sorted = (result.data || [])
-        .sort((a, b) => (b.id || 0) - (a.id || 0))
-      
+      const sorted = (result.data || []).sort((a, b) => (b.id || 0) - (a.id || 0))
+
       items.value = sorted.map((item, idx) => ({
         id: item.id,
         number: item.barcode,
@@ -60,7 +59,7 @@ export const useSeparateStore = defineStore('separate', () => {
         comment: item.brain_comment || item.comment || '',
         is_stop_item: item.is_stop_item || false,
         scannedAt: item.created_at || null,
-        placeNumber: sorted.length - idx,
+        placeNumber: sorted.length - idx
       }))
 
       return items.value
@@ -73,7 +72,7 @@ export const useSeparateStore = defineStore('separate', () => {
   async function addItem(item) {
     // M2 fix: consistent duplicate detection с isDuplicate — используем parseBarcode
     const parsed = parseBarcodeToBrainNumber(item.number)
-    const duplicate = items.value.find(i => {
+    const duplicate = items.value.find((i) => {
       if (i.number === item.number) return true
       const iParsed = parseBarcodeToBrainNumber(i.number)
       return iParsed && parsed && iParsed === parsed
@@ -83,18 +82,22 @@ export const useSeparateStore = defineStore('separate', () => {
     }
 
     // Сохраняем состояние для undo
-    const itemCopy = JSON.parse(JSON.stringify({
-      ...item,
-      scannedAt: new Date().toISOString(),
-      placeNumber: items.value.length + 1
-    }))
+    const itemCopy = JSON.parse(
+      JSON.stringify({
+        ...item,
+        scannedAt: new Date().toISOString(),
+        placeNumber: items.value.length + 1
+      })
+    )
 
     // Добавляем товар локально (optimistic update) — unshift = в начало списка
-    const pushIndex = 0  // M5 fix: запоминаем индекс для точного rollback вместо pop()
+    const pushIndex = 0 // M5 fix: запоминаем индекс для точного rollback вместо pop()
     items.value.unshift(itemCopy)
 
     // Обновляем placeNumber для всех товаров
-    items.value.forEach((i, idx) => { i.placeNumber = idx + 1 })
+    items.value.forEach((i, idx) => {
+      i.placeNumber = idx + 1
+    })
 
     // Добавляем в историю действий
     actionHistory.value.push({
@@ -160,7 +163,7 @@ export const useSeparateStore = defineStore('separate', () => {
         if (result.error) throw new Error(result.error.message)
       } catch (err) {
         // BUG-22 fix: rollback — возвращаем товар на место при ошибке сервера
-        const actualIndex = items.value.findIndex(i => i.number === itemToRemove.number)
+        const actualIndex = items.value.findIndex((i) => i.number === itemToRemove.number)
         if (actualIndex !== -1) {
           items.value.splice(actualIndex, 0, itemToRemove)
         }
@@ -176,7 +179,7 @@ export const useSeparateStore = defineStore('separate', () => {
 
     // BUG-210 fix: splice выполняется после завершения серверной операции
     // Удаляем по ссылке, а не по индексу — предотвращаем race condition
-    const actualIndex = items.value.findIndex(i => i.number === itemToRemove.number)
+    const actualIndex = items.value.findIndex((i) => i.number === itemToRemove.number)
     if (actualIndex !== -1) {
       items.value.splice(actualIndex, 1)
     }
@@ -194,9 +197,7 @@ export const useSeparateStore = defineStore('separate', () => {
     const lastAction = actionHistory.value[actionHistory.value.length - 1] // M6 fix: не pop'ем сразу — если офлайн, сохраним возможность rollback
 
     if (lastAction.type === 'add_item') {
-      const itemIndex = items.value.findIndex(
-        item => item.number === lastAction.item.number
-      )
+      const itemIndex = items.value.findIndex((item) => item.number === lastAction.item.number)
       if (itemIndex !== -1) {
         // M6 fix: если офлайн — НЕ удаляем actionHistory, queue для синхронизации позже
         if (!navigator.onLine) {
@@ -215,7 +216,7 @@ export const useSeparateStore = defineStore('separate', () => {
         const itemToRemove = items.value[itemIndex]
 
         // Удаляем локально и отправляем на сервер синхронно
-        actionHistory.value.pop()  // pop'ем только если онлайн — можем rollback при ошибке
+        actionHistory.value.pop() // pop'ем только если онлайн — можем rollback при ошибке
         items.value.splice(itemIndex, 1)
         items.value.forEach((item, idx) => {
           item.placeNumber = idx + 1
@@ -245,7 +246,7 @@ export const useSeparateStore = defineStore('separate', () => {
   /** Проверка дубликата */
   function isDuplicate(barcode) {
     const parsed = parseBarcodeToBrainNumber(barcode)
-    return items.value.some(item => item.number === barcode || (parsed && item.number === parsed))
+    return items.value.some((item) => item.number === barcode || (parsed && item.number === parsed))
   }
 
   /** Очистить весь список на сервере и локально */
@@ -263,8 +264,8 @@ export const useSeparateStore = defineStore('separate', () => {
       }
     }
     items.value = []
-    actionHistory.value = []  // L1 fix: сбрасываем историю при очистке
-    pendingOfflineDeletes.value = []  // очищаем очередь удалений тоже
+    actionHistory.value = [] // L1 fix: сбрасываем историю при очистке
+    pendingOfflineDeletes.value = [] // очищаем очередь удалений тоже
     return true
   }
 
@@ -307,6 +308,6 @@ export const useSeparateStore = defineStore('separate', () => {
     isDuplicate,
     clearAll,
     loadSeparateItems,
-    flushPendingOfflineDeletes  // BUG-6 fix: export для main.js online handler
+    flushPendingOfflineDeletes // BUG-6 fix: export для main.js online handler
   }
 })

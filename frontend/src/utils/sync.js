@@ -34,7 +34,7 @@ function decodeMojibake(text) {
     for (let i = 0; i < text.length; i++) {
       const code = text.charCodeAt(i)
       // Windows-1251: символы 0x80-0xFF маппятся на те же code points
-      bytes[i] = code > 0xFF ? 0x3F : code // fallback на '?' если超出 диапазона
+      bytes[i] = code > 0xff ? 0x3f : code // fallback на '?' если超出 диапазона
     }
     const decoder = new TextDecoder('utf-8', { fatal: true })
     return decoder.decode(bytes)
@@ -72,7 +72,9 @@ class ScanBatchManager {
   }
 
   saveBatch() {
-    try { localStorage.setItem(SCAN_BATCH_QUEUE_KEY, JSON.stringify(this.batch)) } catch {}
+    try {
+      localStorage.setItem(SCAN_BATCH_QUEUE_KEY, JSON.stringify(this.batch))
+    } catch {}
   }
 
   add(scanData) {
@@ -99,7 +101,6 @@ class ScanBatchManager {
       this.retryCount = 0
       this.saveBatch()
     } catch (error) {
-
       // BUG-10 fix: backoff retry вместо потери batch
       this.retryCount++
       const delay = Math.min(1000 * Math.pow(2, this.retryCount), this.MAX_RETRY_DELAY)
@@ -123,7 +124,9 @@ class ScanBatchManager {
   /** Получить последний скан для barcode из локального батча */
   getLastScan(barcode) {
     // Ищем все сканы с этим barcode и берём самый свежий
-    const matchingScans = this.batch.filter(s => s.barcode === barcode).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    const matchingScans = this.batch
+      .filter((s) => s.barcode === barcode)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     if (matchingScans.length > 0 && matchingScans[0].created_at) {
       return new Date(matchingScans[0].created_at).toISOString()
     }
@@ -143,7 +146,7 @@ export async function syncBrainItems(items, columnMapping, uploaderEmployeeId = 
   if (!userId || !navigator.onLine) return
 
   try {
-    const rows = items.map(item => ({
+    const rows = items.map((item) => ({
       barcode: item.number,
       name: item.name,
       brand: item.article || '',
@@ -153,8 +156,7 @@ export async function syncBrainItems(items, columnMapping, uploaderEmployeeId = 
     }))
 
     await db.brainItems.import({ rows })
-  } catch (error) {
-  }
+  } catch (error) {}
 }
 
 /** Загрузка базы brain items с бэкенда */
@@ -165,9 +167,9 @@ export async function loadBrainItemsFromBackend() {
   try {
     const result = await db.brainItems.getAll()
     if (result.error) throw new Error(result.error.message)
-    return (result.data || []).map(item => ({
+    return (result.data || []).map((item) => ({
       number: item.barcode,
-      name: decodeMojibake((item.name || '').trim()) || 'Без названия',  // Fallback на "Без названия" если пусто + mojibake fix
+      name: decodeMojibake((item.name || '').trim()) || 'Без названия', // Fallback на "Без названия" если пусто + mojibake fix
       article: decodeMojibake(item.brand || ''),
       comment: decodeMojibake(item.comment || '')
     }))
@@ -215,7 +217,7 @@ export async function loadSeparateItemsFromBackend() {
   try {
     const result = await db.separateItems.getAll()
     if (result.error) throw new Error(result.error.message)
-    return (result.data || [])
+    return result.data || []
   } catch (error) {
     return []
   }

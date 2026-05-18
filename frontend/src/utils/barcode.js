@@ -62,7 +62,6 @@ export function parseBarcodeToBrainNumber(barcode) {
   return null
 }
 
-
 /**
  * Проверяет соответствие штрихкода номеру в БД
  * @param {string} scannedBarcode - штрихкод со сканера
@@ -72,7 +71,7 @@ export function parseBarcodeToBrainNumber(barcode) {
 export function isBarcodeMatch(scannedBarcode, dbNumber) {
   const parsed = parseBarcodeToBrainNumber(scannedBarcode)
   if (!parsed) return false
-  
+
   // Сравниваем с номером в БД
   return parsed === dbNumber
 }

@@ -31,7 +31,7 @@ function handleConfirm() {
 }
 
 const selectedText = computed(() => {
-  const col = props.columns?.find(c => c.value === props.modelValue)
+  const col = props.columns?.find((c) => c.value === props.modelValue)
   return col?.text || 'Выберите значение'
 })
 
@@ -79,12 +79,13 @@ defineExpose({ open })
             leave-to-class="transform translate-y-full"
           >
             <div
+              v-if="isOpen"
               class="picker-container bg-slate-900 rounded-t-3xl w-full overflow-hidden border-t border-slate-700 shadow-2xl"
               @click.stop
             >
               <!-- Header -->
               <div class="flex items-center justify-between px-4 py-3 border-b border-slate-700">
-                <button 
+                <button
                   class="text-slate-200 text-base hover:text-slate-200 transition-colors border-none rounded-lg px-3 py-1 bg-slate-800/50 hover:bg-slate-800/70 cursor-pointer"
                   @click="close"
                 >
@@ -93,7 +94,7 @@ defineExpose({ open })
                 <h3 class="text-slate-100 font-semibold text-base">
                   {{ title }}
                 </h3>
-                <button 
+                <button
                   class="text-primary-400 text-base hover:text-primary-300 transition-colors border-none rounded-lg px-3 py-1 bg-slate-800/50 hover:bg-slate-800/70 ursor-pointer"
                   @click="handleConfirm"
                 >

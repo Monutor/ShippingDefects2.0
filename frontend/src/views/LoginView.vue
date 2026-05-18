@@ -38,7 +38,7 @@ async function handleLogin() {
     if (result.data) {
       // Профиль найден — авторизуем
       const profile = result.data.profile || {}
-      
+
       // L1 fix: is_admin берём приоритетно из JWT payload, fallback на profile (consistency)
       const isAdmin = result.data.is_admin || profile.is_admin || false
 
@@ -49,14 +49,17 @@ async function handleLogin() {
       })
 
       // Сохраняем токен и данные в localStorage
-      localStorage.setItem('warehouse-brain-user', JSON.stringify({
-        employeeId: employeeId.value.trim(),
-        fullName: profile.full_name,
-        position: profile.position,
-        is_admin: isAdmin,
-        token: result.data.token,
-        authenticatedAt: new Date().toISOString()
-      }))
+      localStorage.setItem(
+        'warehouse-brain-user',
+        JSON.stringify({
+          employeeId: employeeId.value.trim(),
+          fullName: profile.full_name,
+          position: profile.position,
+          is_admin: isAdmin,
+          token: result.data.token,
+          authenticatedAt: new Date().toISOString()
+        })
+      )
 
       window.dispatchEvent(new CustomEvent('auth-changed'))
       // BUG-9 fix: переподключаем WS после успешного логина (токен появился)
@@ -108,14 +111,17 @@ async function handleRegister() {
 
       const isAdmin = false // Новые пользователи всегда не-админы
 
-      localStorage.setItem('warehouse-brain-user', JSON.stringify({
-        employeeId: employeeId.value.trim(),
-        fullName: fullName.value.trim(),
-        position: position.value.trim() || 'Сборщик',
-        is_admin: isAdmin,
-        token: result.data.token,
-        authenticatedAt: new Date().toISOString()
-      }))
+      localStorage.setItem(
+        'warehouse-brain-user',
+        JSON.stringify({
+          employeeId: employeeId.value.trim(),
+          fullName: fullName.value.trim(),
+          position: position.value.trim() || 'Сборщик',
+          is_admin: isAdmin,
+          token: result.data.token,
+          authenticatedAt: new Date().toISOString()
+        })
+      )
 
       window.dispatchEvent(new CustomEvent('auth-changed'))
       // BUG-9 fix: переподключаем WS после регистрации (токен появился)
@@ -139,7 +145,9 @@ function goBack() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex flex-col">
+  <div
+    class="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 flex flex-col"
+  >
     <!-- Nav Bar -->
     <NavBar
       :title="step === 'login' ? 'Вход' : 'Регистрация'"
@@ -169,12 +177,7 @@ function goBack() {
           autocomplete="off"
         />
 
-        <Button
-          block
-          class="custom-btn-primary"
-          :loading="isLoading"
-          @click="handleLogin"
-        >
+        <Button block class="custom-btn-primary" :loading="isLoading" @click="handleLogin">
           Войти
         </Button>
       </div>
@@ -196,26 +199,11 @@ function goBack() {
           autocomplete="off"
         />
 
-        <Input
-          v-model="fullName"
-          label="ФИО"
-          placeholder="Иванов Иван Иванович"
-          type="text"
-        />
+        <Input v-model="fullName" label="ФИО" placeholder="Иванов Иван Иванович" type="text" />
 
-        <Input
-          v-model="position"
-          label="Должность"
-          placeholder="Кладовщик"
-          type="text"
-        />
+        <Input v-model="position" label="Должность" placeholder="Кладовщик" type="text" />
 
-        <Button
-          block
-          class="custom-btn-primary"
-          :loading="isLoading"
-          @click="handleRegister"
-        >
+        <Button block class="custom-btn-primary" :loading="isLoading" @click="handleRegister">
           Зарегистрироваться
         </Button>
       </div>

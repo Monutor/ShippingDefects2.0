@@ -4,7 +4,12 @@ import { useRouter, useRoute } from 'vue-router'
 import { useBoxesStore } from '@/stores/boxes'
 import { useCollectorStore } from '@/stores/collector'
 import { usePalletStore } from '@/stores/pallet'
-import { exportBoxToExcel, exportPalletToExcel, exportPalletsToExcel, exportToExcel } from '@/utils/excel'
+import {
+  exportBoxToExcel,
+  exportPalletToExcel,
+  exportPalletsToExcel,
+  exportToExcel
+} from '@/utils/excel'
 import { ws, db } from '@/lib/api.js'
 import { Button, Badge, NavBar, Modal, SwipeCard, Loader } from '@/components/ui'
 import { isAdmin } from '@/config'
@@ -80,8 +85,8 @@ watch(viewedBoxId, async (boxId) => {
   if (!boxId || !navigator.onLine) return
 
   // Guard: не грузить если этот короб уже загружен (из любого источника — boxes или availableBoxes)
-  const fromBoxes = boxesStore.boxes.find(b => b.id === boxId && b.itemsLoaded)
-  const fromAvailable = palletStore.availableBoxes?.find(b => b.id === boxId && b.itemsLoaded)
+  const fromBoxes = boxesStore.boxes.find((b) => b.id === boxId && b.itemsLoaded)
+  const fromAvailable = palletStore.availableBoxes?.find((b) => b.id === boxId && b.itemsLoaded)
   if (fromBoxes || fromAvailable) {
     return
   }
@@ -96,8 +101,8 @@ watch(viewedBoxId, async (boxId) => {
 
   // Загружаем все короба и фильтруем по ID
   const result = await db.boxes.getAll()
-  if (gen !== _lastLoadGen) return  // gen изменился — есть новый запрос, отменяем
-  
+  if (gen !== _lastLoadGen) return // gen изменился — есть новый запрос, отменяем
+
   if (result?.error || !result?.data) {
     viewedBox.value = null
     viewedBoxItems.value = []
@@ -105,9 +110,9 @@ watch(viewedBoxId, async (boxId) => {
   }
 
   // Ищем короб с нужным ID — проверяем что gen не изменился за время поиска
-  const foundBox = result.data.find(b => b.id === boxId || b.box_id === boxId)
+  const foundBox = result.data.find((b) => b.id === boxId || b.box_id === boxId)
   if (gen !== _lastLoadGen) return
-  
+
   if (!foundBox) {
     viewedBox.value = null
     viewedBoxItems.value = []
@@ -119,8 +124,8 @@ watch(viewedBoxId, async (boxId) => {
   // Загружаем товары короба — проверяем что gen не изменился за время запроса
   const itemsResult = await db.boxItems.getByBoxId(boxId)
   if (gen !== _lastLoadGen) return
-  
-  viewedBoxItems.value = (itemsResult.data || []).map(item => ({
+
+  viewedBoxItems.value = (itemsResult.data || []).map((item) => ({
     number: item.barcode,
     name: item.name,
     article: item.brand || '',
@@ -138,14 +143,19 @@ async function loadPalletsForTab() {
     let activePallet = null
     if (navigator.onLine) {
       activePallet = await palletStore.loadActivePallet()
-      
+
       // Если currentPallet есть но items пустой — загрузить с сервера принудительно
-      if (palletStore.currentPallet && (!palletStore.currentPallet.items || palletStore.currentPallet.items.length === 0)) {
-        const itemsResult = await db.palletItems.getByPalletId(palletStore.currentPallet.backendId || palletStore.currentPallet.id)
+      if (
+        palletStore.currentPallet &&
+        (!palletStore.currentPallet.items || palletStore.currentPallet.items.length === 0)
+      ) {
+        const itemsResult = await db.palletItems.getByPalletId(
+          palletStore.currentPallet.backendId || palletStore.currentPallet.id
+        )
         if (itemsResult.data?.length > 0) {
-          const items = itemsResult.data.map(i => ({
+          const items = itemsResult.data.map((i) => ({
             source_type: i.source_type,
-            source_id: i.source_id,
+            source_id: i.source_id
           }))
           palletStore.currentPallet = { ...palletStore.currentPallet, items }
         }
@@ -160,7 +170,7 @@ async function loadPalletsForTab() {
     ])
 
     if (palletStore.pallets && palletStore.pallets.length > 0) {
-      pallets.value = palletStore.pallets.map(p => ({ ...p, seal: p.seal || null }))
+      pallets.value = palletStore.pallets.map((p) => ({ ...p, seal: p.seal || null }))
     } else {
       pallets.value = []
     }
@@ -190,7 +200,7 @@ const palletsClearedHandler = () => {
 const boxFinishedHandler = async (msg) => {
   const boxId = msg.box_id
   if (!boxId) return
-  
+
   // Перезагружаем все короба чтобы получить актуальный статус
   await boxesStore.loadBoxes()
 }
@@ -226,7 +236,7 @@ const containerItemAddedHandler = async (msg) => {
   if (matchesViewedBox) {
     const result = await db.boxItems.getByBoxId(viewedBoxId.value)
     if (result.data?.length > 0) {
-      viewedBoxItems.value = result.data.map(item => ({
+      viewedBoxItems.value = result.data.map((item) => ({
         number: item.barcode,
         name: item.name,
         article: item.brand || '',
@@ -241,7 +251,7 @@ const containerItemAddedHandler = async (msg) => {
     if (result.data?.length > 0) {
       boxesStore.currentBox = {
         ...boxesStore.currentBox,
-        items: result.data.map(i => ({ barcode: i.barcode, name: i.name }))
+        items: result.data.map((i) => ({ barcode: i.barcode, name: i.name }))
       }
     }
   }
@@ -308,12 +318,16 @@ async function exportBox(box) {
 // Экспорт просмотренного короба (через ?id=)
 async function exportViewedBox() {
   if (!viewedBoxItems.value.length || !viewedBoxId.value) return
-  
+
   const box = {
     ...viewedBox.value,
-    items: viewedBoxItems.value.map(item => ({ name: item.name, number: item.number, article: item.article }))
+    items: viewedBoxItems.value.map((item) => ({
+      name: item.name,
+      number: item.number,
+      article: item.article
+    }))
   }
-  
+
   const result = await exportBoxToExcel(box, {
     position: collectorStore.position,
     fullName: collectorStore.fullName
@@ -324,7 +338,7 @@ async function exportViewedBox() {
 // Завершение текущего паллета (для таба «Текущий»)
 async function finishCurrentPalletFromBoxes() {
   if (!palletStore.currentPallet) return
-  
+
   try {
     const result = await palletStore.finishCurrentPallet()
     if (result?.success || result?.seal) {
@@ -339,13 +353,13 @@ async function finishCurrentPalletFromBoxes() {
 
 async function exportAllBoxes() {
   // Перед экспортом загружаем items для всех коробов которые ещё не загружены (из обоих источников)
-  const unloadedFromStore = boxesStore.boxes.filter(b => !b.itemsLoaded && b.id)
-  const unloadedAvailable = palletStore.availableBoxes?.filter(b => !b.itemsLoaded && b.id) || []
-  
+  const unloadedFromStore = boxesStore.boxes.filter((b) => !b.itemsLoaded && b.id)
+  const unloadedAvailable = palletStore.availableBoxes?.filter((b) => !b.itemsLoaded && b.id) || []
+
   let allUnloaded = [...unloadedFromStore, ...unloadedAvailable]
   // Убираем дубликаты по id
   const seenIds = new Set()
-  allUnloaded = allUnloaded.filter(box => {
+  allUnloaded = allUnloaded.filter((box) => {
     if (seenIds.has(box.id)) return false
     seenIds.add(box.id)
     return true
@@ -353,15 +367,17 @@ async function exportAllBoxes() {
 
   if (allUnloaded.length > 0) {
     window.showToast(`Загрузка данных... (${allUnloaded.length} коробов)`)
-    await Promise.all(allUnloaded.map(async box => {
-      // Определяем откуда короб и вызываем правильный store
-      const fromStore = boxesStore.boxes.find(b => b.id === box.id)
-      if (fromStore && !fromStore.itemsLoaded) {
-        return boxesStore.refreshBoxItems(box.id)
-      } else {
-        return palletStore.refreshAvailableBoxItems(box.id)
-      }
-    }))
+    await Promise.all(
+      allUnloaded.map(async (box) => {
+        // Определяем откуда короб и вызываем правильный store
+        const fromStore = boxesStore.boxes.find((b) => b.id === box.id)
+        if (fromStore && !fromStore.itemsLoaded) {
+          return boxesStore.refreshBoxItems(box.id)
+        } else {
+          return palletStore.refreshAvailableBoxItems(box.id)
+        }
+      })
+    )
   }
 
   const allItems = boxesStore.getAllBoxItems()
@@ -369,10 +385,10 @@ async function exportAllBoxes() {
     window.showToast('Нет данных для экспорта')
     return
   }
-  const exportData = allItems.map(item => ({
-    'Короб': item.boxName,
-    'Номер': item.number,
-    'Наименование': item.name,
+  const exportData = allItems.map((item) => ({
+    Короб: item.boxName,
+    Номер: item.number,
+    Наименование: item.name,
     'Код товара': item.article,
     'Дата сканирования': new Date(item.scannedAt).toLocaleString('ru-RU')
   }))
@@ -389,9 +405,9 @@ async function exportAllPallets() {
     window.showToast('Нет данных для экспорта')
     return
   }
-  
+
   window.showToast(`Загрузка данных... (${pallets.value.length} паллетов)`)
-  
+
   // Загружаем детали для каждого паллета
   for (const pallet of pallets.value) {
     if (!pallet.itemsLoaded && pallet.id) {
@@ -404,16 +420,16 @@ async function exportAllPallets() {
     window.showToast('Нет данных для экспорта')
     return
   }
-  
-  const exportData = allItems.map(item => ({
-    'Паллет': item.palletName,
-    'Тип': item.type || '',
-    'Номер': item.number,
-    'Наименование': item.name,
+
+  const exportData = allItems.map((item) => ({
+    Паллет: item.palletName,
+    Тип: item.type || '',
+    Номер: item.number,
+    Наименование: item.name,
     'Код товара': item.article,
     'Дата сканирования': item.scannedAt ? new Date(item.scannedAt).toLocaleString('ru-RU') : ''
   }))
-  
+
   const result = await exportPalletsToExcel(allItems, 'Все_паллеты')
   if (result.success) {
     window.showToast(`Файл скачан: ${result.filename}`)
@@ -500,55 +516,93 @@ function formatDate(dateString) {
 </script>
 
 <template>
-  <div class="boxes-view min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 pb-20">
+  <div
+    class="boxes-view min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 pb-20"
+  >
     <!-- Nav Bar -->
-    <NavBar
-      title="Учёт брака"
-      left-text="Назад"
-      left-arrow
-      @click-left="$router.back()"
-    />
+    <NavBar title="Учёт брака" left-text="Назад" left-arrow @click-left="$router.back()" />
 
     <!-- Tabs -->
     <div class="w-full mt-2">
       <!-- Tab Headers — reactive titles! -->
-      <div class="flex items-center bg-slate-800/80 backdrop-blur-sm border-b border-slate-700 rounded-t-2xl">
-        <button :class="[
-          'flex-1 py-3.5 text-sm font-semibold transition-all duration-200',
-          activeTab === 0 ? 'text-slate-100 border-b-2 border-primary-500' : 'text-slate-500 hover:text-slate-300'
-        ]" @click="activeTab = 0">{{ tab0Title }}</button>
-        <button :class="[
-          'flex-1 py-3.5 text-sm font-semibold transition-all duration-200',
-          activeTab === 1 ? 'text-slate-100 border-b-2 border-primary-500' : 'text-slate-500 hover:text-slate-300'
-        ]" @click="activeTab = 1">{{ tab1Title }}</button>
+      <div
+        class="flex items-center bg-slate-800/80 backdrop-blur-sm border-b border-slate-700 rounded-t-2xl"
+      >
+        <button
+          :class="[
+            'flex-1 py-3.5 text-sm font-semibold transition-all duration-200',
+            activeTab === 0
+              ? 'text-slate-100 border-b-2 border-primary-500'
+              : 'text-slate-500 hover:text-slate-300'
+          ]"
+          @click="activeTab = 0"
+        >
+          {{ tab0Title }}
+        </button>
+        <button
+          :class="[
+            'flex-1 py-3.5 text-sm font-semibold transition-all duration-200',
+            activeTab === 1
+              ? 'text-slate-100 border-b-2 border-primary-500'
+              : 'text-slate-500 hover:text-slate-300'
+          ]"
+          @click="activeTab = 1"
+        >
+          {{ tab1Title }}
+        </button>
       </div>
 
       <!-- Tab Content -->
-      <div class="bg-slate-800/50 backdrop-blur-sm border-x border-b border-slate-700 rounded-b-2xl">
-        
+      <div
+        class="bg-slate-800/50 backdrop-blur-sm border-x border-b border-slate-700 rounded-b-2xl"
+      >
         <!-- Tab 0: Миксы -->
         <div v-if="activeTab === 0" class="p-4">
           <!-- Просмотр конкретного короба (через ?id=) -->
           <template v-if="viewedBoxId && viewedBox">
-            <div class="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-5 text-white shadow-lg shadow-indigo-500/20 border border-indigo-500/30 mb-6 relative">
+            <div
+              class="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-5 text-white shadow-lg shadow-indigo-500/20 border border-indigo-500/30 mb-6 relative"
+            >
               <!-- Бейдж владельца -->
-              <span v-if="!isOwner(viewedBox.collector_id)" class="absolute top-[-10px] right-4 px-3 py-1 bg-red-500 border border-red-400 rounded-full text-xs font-bold text-white shadow-lg">
+              <span
+                v-if="!isOwner(viewedBox.collector_id)"
+                class="absolute top-[-10px] right-4 px-3 py-1 bg-red-500 border border-red-400 rounded-full text-xs font-bold text-white shadow-lg"
+              >
                 ЧУЖОЙ — {{ viewedBox.collector_id }}
               </span>
-              <div class="flex items-center gap-4 mb-3" :class="{ 'opacity-60 pointer-events-none': !isOwner(viewedBox.collector_id) }">
-                <div class="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center text-2xl flex-shrink-0">📦</div>
+              <div
+                class="flex items-center gap-4 mb-3"
+                :class="{ 'opacity-60 pointer-events-none': !isOwner(viewedBox.collector_id) }"
+              >
+                <div
+                  class="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center text-2xl flex-shrink-0"
+                >
+                  📦
+                </div>
                 <div class="flex-1 min-w-0">
                   <h3 class="font-semibold text-lg truncate">{{ viewedBox.name || 'Короб' }}</h3>
-                  <p class="text-sm text-white/80">👤 {{ viewedBox.collector_id || 'Неизвестный' }} · 📦 {{ viewedBoxItems.length }} товаров</p>
+                  <p class="text-sm text-white/80">
+                    👤 {{ viewedBox.collector_id || 'Неизвестный' }} · 📦
+                    {{ viewedBoxItems.length }} товаров
+                  </p>
                 </div>
               </div>
 
               <!-- Содержимое короба -->
-              <div v-if="viewedBoxItems.length > 0" class="mt-3 space-y-2 max-h-64 overflow-y-auto scrollbar-thin">
-                <div v-for="(item, idx) in viewedBoxItems" :key="idx" class="flex items-center gap-3 bg-white/10 rounded-xl p-3">
+              <div
+                v-if="viewedBoxItems.length > 0"
+                class="mt-3 space-y-2 max-h-64 overflow-y-auto scrollbar-thin"
+              >
+                <div
+                  v-for="(item, idx) in viewedBoxItems"
+                  :key="idx"
+                  class="flex items-center gap-3 bg-white/10 rounded-xl p-3"
+                >
                   <span class="text-lg">📋</span>
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-slate-100 truncate">{{ item.name || 'Товар' }}</p>
+                    <p class="text-sm font-medium text-slate-100 truncate">
+                      {{ item.name || 'Товар' }}
+                    </p>
                     <p class="text-xs text-white/60 font-mono">{{ item.number || '—' }}</p>
                     <p v-if="item.article" class="text-xs text-white/50 mt-1">{{ item.article }}</p>
                   </div>
@@ -557,7 +611,12 @@ function formatDate(dateString) {
 
               <!-- Кнопка экспорта -->
               <div class="mt-4">
-                <Button variant="success" block :disabled="viewedBoxItems.length === 0 || !isOwner(viewedBox.collector_id)" @click="exportViewedBox()">
+                <Button
+                  variant="success"
+                  block
+                  :disabled="viewedBoxItems.length === 0 || !isOwner(viewedBox.collector_id)"
+                  @click="exportViewedBox()"
+                >
                   Экспорт Excel
                 </Button>
               </div>
@@ -566,83 +625,112 @@ function formatDate(dateString) {
 
           <!-- Список миксов (когда не просматриваем конкретный короб) -->
           <template v-else>
-          <Loader v-if="isLoadingPallets" text="Загрузка коробов..." />
+            <Loader v-if="isLoadingPallets" text="Загрузка коробов..." />
 
-          <div v-else-if="boxesStore.boxes.length === 0" class="empty-state py-16">
-            <div class="w-24 h-24 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center mx-auto mb-6 border-2 border-amber-500/30">
-              <span class="text-5xl">📦</span>
-            </div>
-            <h3 class="text-lg font-semibold text-slate-100 mb-2">Пока нет миксов</h3>
-            <p class="text-slate-400 text-sm mb-6">Начните сканирование для создания первого короба</p>
-            <Button @click="$router.push('/mix-view')">Начать сканирование</Button>
-          </div>
-
-          <div v-else class="boxes-list py-4">
-            <SwipeCard
-              v-for="(box, index) in boxesStore.boxesReverse"
-              :key="box.id"
-              @delete="requestDeleteBoxWithBox(boxesStore.boxes.length - 1 - index, box)"
-            >
-              <div class="box-card p-4 cursor-pointer" @click="$router.push(`/mix/${box.id}`)">
-                <!-- Бейдж владельца -->
-                <div class="flex items-center justify-between mb-2">
-                  <p class="text-xs text-slate-500 mb-1">👤 {{ box.collector_id || 'Неизвестный' }}</p>
-                  <span v-if="!isOwner(box.collector_id)" class="px-2 py-0.5 bg-red-500/20 border border-red-500/30 rounded-full text-xs font-semibold text-red-400">
-                    ЧУЖОЙ
-                  </span>
-                </div>
-                <div class="flex items-start justify-between gap-3">
-                  <div class="flex-1 min-w-0">
-                    <h3 class="font-semibold text-lg text-slate-100 mb-1">{{ box.name }}</h3>
-                    <p class="text-sm text-slate-400">
-                      <template v-if="box.itemsLoaded">
-                        <span class="font-medium text-amber-400">{{ box.items.length }}</span> товаров
-                        <span class="mx-2 text-slate-600">•</span> {{ formatDate(box.createdAt) }} завершён
-                      </template>
-                      <template v-else>
-                        нажмите чтобы посмотреть
-                        <span class="mx-2 text-slate-600">•</span> {{ formatDate(box.createdAt) }} завершён
-                      </template>
-                    </p>
-                  </div>
-                  <span class="text-slate-500 flex-shrink-0 self-center">
-                    <van-icon name="arrow" size="20" />
-                  </span>
-                </div>
+            <div v-else-if="boxesStore.boxes.length === 0" class="empty-state py-16">
+              <div
+                class="w-24 h-24 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center mx-auto mb-6 border-2 border-amber-500/30"
+              >
+                <span class="text-5xl">📦</span>
               </div>
-            </SwipeCard>
-            <Button block class="mt-4 custom-btn-primary" @click="exportAllBoxes">
-              <van-icon name="down" class="mr-2" /> Экспортировать все короба ({{ boxesStore.boxes.length }})
-            </Button>
-          </div>
-          </template><!-- /v-else -->
+              <h3 class="text-lg font-semibold text-slate-100 mb-2">Пока нет миксов</h3>
+              <p class="text-slate-400 text-sm mb-6">
+                Начните сканирование для создания первого короба
+              </p>
+              <Button @click="$router.push('/mix-view')">Начать сканирование</Button>
+            </div>
+
+            <div v-else class="boxes-list py-4">
+              <SwipeCard
+                v-for="(box, index) in boxesStore.boxesReverse"
+                :key="box.id"
+                @delete="requestDeleteBoxWithBox(boxesStore.boxes.length - 1 - index, box)"
+              >
+                <div class="box-card p-4 cursor-pointer" @click="$router.push(`/mix/${box.id}`)">
+                  <!-- Бейдж владельца -->
+                  <div class="flex items-center justify-between mb-2">
+                    <p class="text-xs text-slate-500 mb-1">
+                      👤 {{ box.collector_id || 'Неизвестный' }}
+                    </p>
+                    <span
+                      v-if="!isOwner(box.collector_id)"
+                      class="px-2 py-0.5 bg-red-500/20 border border-red-500/30 rounded-full text-xs font-semibold text-red-400"
+                    >
+                      ЧУЖОЙ
+                    </span>
+                  </div>
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                      <h3 class="font-semibold text-lg text-slate-100 mb-1">{{ box.name }}</h3>
+                      <p class="text-sm text-slate-400">
+                        <template v-if="box.itemsLoaded">
+                          <span class="font-medium text-amber-400">{{ box.items.length }}</span>
+                          товаров <span class="mx-2 text-slate-600">•</span>
+                          {{ formatDate(box.createdAt) }} завершён
+                        </template>
+                        <template v-else>
+                          нажмите чтобы посмотреть
+                          <span class="mx-2 text-slate-600">•</span>
+                          {{ formatDate(box.createdAt) }} завершён
+                        </template>
+                      </p>
+                    </div>
+                    <span class="text-slate-500 flex-shrink-0 self-center">
+                      <van-icon name="arrow" size="20" />
+                    </span>
+                  </div>
+                </div>
+              </SwipeCard>
+              <Button block class="mt-4 custom-btn-primary" @click="exportAllBoxes">
+                <van-icon name="down" class="mr-2" /> Экспортировать все короба ({{
+                  boxesStore.boxes.length
+                }})
+              </Button>
+            </div> </template
+          ><!-- /v-else -->
         </div>
 
         <!-- Tab 1: Паллеты -->
         <div v-if="activeTab === 1" class="p-4">
           <Loader v-if="isLoadingPallets" text="Загрузка паллетов..." />
           <div v-else-if="palletCount === 0 && !viewedBoxId" class="empty-state py-8">
-            <div class="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center mx-auto mb-6 border-2 border-blue-500/30">
+            <div
+              class="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center mx-auto mb-6 border-2 border-blue-500/30"
+            >
               <span class="text-5xl">🏗️</span>
             </div>
             <h3 class="text-lg font-semibold text-slate-100 mb-2">Сборка паллета</h3>
 
             <div v-if="availableBoxes.length > 0" class="space-y-3 px-4 max-w-md mx-auto">
-              <p class="text-slate-400 text-sm mb-3">Доступно готовых коробов: {{ availableBoxes.length }}</p>
-              <div class="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden divide-y divide-slate-700/50 max-h-64 overflow-y-auto scrollbar-thin">
-                <div v-for="box in availableBoxes" :key="box.id" class="p-3 flex items-center gap-3 hover:bg-slate-700/30 transition-colors cursor-pointer" @click="loadAvailableBoxItems(box)">
-                  <div class="w-10 h-10 rounded-lg bg-primary-500/20 border border-primary-500/30 flex items-center justify-center flex-shrink-0">
+              <p class="text-slate-400 text-sm mb-3">
+                Доступно готовых коробов: {{ availableBoxes.length }}
+              </p>
+              <div
+                class="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden divide-y divide-slate-700/50 max-h-64 overflow-y-auto scrollbar-thin"
+              >
+                <div
+                  v-for="box in availableBoxes"
+                  :key="box.id"
+                  class="p-3 flex items-center gap-3 hover:bg-slate-700/30 transition-colors cursor-pointer"
+                  @click="loadAvailableBoxItems(box)"
+                >
+                  <div
+                    class="w-10 h-10 rounded-lg bg-primary-500/20 border border-primary-500/30 flex items-center justify-center flex-shrink-0"
+                  >
                     <span class="text-sm font-bold text-primary-400">📦</span>
                   </div>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium text-slate-100 truncate">{{ box.name }}</p>
-                    <p v-if="box.itemsLoaded" class="text-xs text-slate-400">{{ box.collector_id || 'Неизвестный' }} · {{ box.itemCount }} тов.</p>
+                    <p v-if="box.itemsLoaded" class="text-xs text-slate-400">
+                      {{ box.collector_id || 'Неизвестный' }} · {{ box.itemCount }} тов.
+                    </p>
                     <p v-else class="text-xs italic text-slate-500">нажмите для загрузки</p>
                   </div>
                 </div>
               </div>
               <Button block class="mt-3 custom-btn-primary" @click="$router.push('/pallet-view')">
-                <van-icon name="add-o" class="mr-2" /> Создать паллет ({{ availableBoxes.length }} коробов доступно)
+                <van-icon name="add-o" class="mr-2" /> Создать паллет ({{ availableBoxes.length }}
+                коробов доступно)
               </Button>
             </div>
 
@@ -653,11 +741,19 @@ function formatDate(dateString) {
           </div>
 
           <div v-else class="boxes-list py-4">
-            <SwipeCard v-for="(pallet, index) in palletsReverse" :key="pallet.id">
-              <div class="box-card p-4 cursor-pointer" @click="$router.push(`/pallet/${pallet.id}`)">
+            <SwipeCard v-for="pallet in palletsReverse" :key="pallet.id">
+              <div
+                class="box-card p-4 cursor-pointer"
+                @click="$router.push(`/pallet/${pallet.id}`)"
+              >
                 <div class="flex items-center justify-between mb-2">
-                  <p class="text-xs text-slate-500 mb-1">👤 {{ pallet.collector_id || 'Неизвестный' }}</p>
-                  <span v-if="!isOwner(pallet.collector_id)" class="px-2 py-0.5 bg-red-500/20 border border-red-500/30 rounded-full text-xs font-semibold text-red-400">
+                  <p class="text-xs text-slate-500 mb-1">
+                    👤 {{ pallet.collector_id || 'Неизвестный' }}
+                  </p>
+                  <span
+                    v-if="!isOwner(pallet.collector_id)"
+                    class="px-2 py-0.5 bg-red-500/20 border border-red-500/30 rounded-full text-xs font-semibold text-red-400"
+                  >
                     ЧУЖОЙ
                   </span>
                 </div>
@@ -665,7 +761,18 @@ function formatDate(dateString) {
                   <div class="flex-1 min-w-0">
                     <h3 class="font-semibold text-lg text-slate-100 mb-1">{{ pallet.name }}</h3>
                     <p class="text-sm text-slate-400">
-                      📦{{ pallet.boxCount != null ? pallet.boxCount : ((pallet.items || []).filter(i => i.source_type === 'box').length) }} · 📋{{ (pallet.separateItemCount != null ? pallet.separateItemCount : ((pallet.items || []).filter(i => i.source_type === 'separate_item').length)) + (pallet.inlineCount || 0) }} товаров
+                      📦{{
+                        pallet.boxCount != null
+                          ? pallet.boxCount
+                          : (pallet.items || []).filter((i) => i.source_type === 'box').length
+                      }}
+                      · 📋{{
+                        (pallet.separateItemCount != null
+                          ? pallet.separateItemCount
+                          : (pallet.items || []).filter((i) => i.source_type === 'separate_item')
+                              .length) + (pallet.inlineCount || 0)
+                      }}
+                      товаров
                       <span class="mx-2 text-slate-600">•</span>
                       {{ formatDate(pallet.finishedAt || '') }} завершён
                     </p>
@@ -677,7 +784,9 @@ function formatDate(dateString) {
               </div>
             </SwipeCard>
             <Button block class="mt-4 custom-btn-primary" @click="exportAllPallets">
-              <van-icon name="down" class="mr-2" /> Экспортировать все паллеты ({{ pallets.length }})
+              <van-icon name="down" class="mr-2" /> Экспортировать все паллеты ({{
+                pallets.length
+              }})
             </Button>
           </div>
         </div>
@@ -686,15 +795,23 @@ function formatDate(dateString) {
         <div v-if="activeTab === 2" class="p-4">
           <Loader v-if="isLoadingPallets" text="Загрузка..." />
           <div v-else-if="palletStore.currentPallet" class="space-y-4">
-            <div class="bg-gradient-to-br from-emerald-600/20 to-teal-700/20 border border-emerald-500/30 rounded-2xl p-4">
+            <div
+              class="bg-gradient-to-br from-emerald-600/20 to-teal-700/20 border border-emerald-500/30 rounded-2xl p-4"
+            >
               <div class="flex items-center gap-3 mb-3">
                 <span class="text-2xl">📦</span>
                 <div>
-                  <h4 class="text-lg font-bold text-emerald-300">{{ palletStore.currentPallet.name }}</h4>
-                  <p class="text-sm text-emerald-400/70">{{ (palletStore.currentPallet.items || []).length }} товаров</p>
+                  <h4 class="text-lg font-bold text-emerald-300">
+                    {{ palletStore.currentPallet.name }}
+                  </h4>
+                  <p class="text-sm text-emerald-400/70">
+                    {{ (palletStore.currentPallet.items || []).length }} товаров
+                  </p>
                 </div>
               </div>
-              <Button block variant="success" @click="$router.push('/pallet')">📋 Перейти к паллету</Button>
+              <Button block variant="success" @click="$router.push('/pallet')"
+                >📋 Перейти к паллету</Button
+              >
             </div>
           </div>
           <div v-else class="empty-state py-8">
@@ -702,28 +819,38 @@ function formatDate(dateString) {
             <p class="text-slate-400 mt-4">Нет текущего паллета</p>
           </div>
         </div>
-      </div><!-- /Tab Content -->
-    </div><!-- /Tabs -->
+      </div>
+      <!-- /Tab Content -->
+    </div>
+    <!-- /Tabs -->
 
     <!-- Модальное окно просмотра короба -->
     <Modal
       v-model="showBoxModal"
       :show-cancel="false"
       confirm-text="Закрыть"
-      @confirm="showBoxModal = false"
       class="box-modal"
+      @confirm="showBoxModal = false"
     >
       <div v-if="selectedBox" class="box-modal-content">
         <!-- Заголовок с градиентом -->
-        <div class="box-header bg-gradient-to-br from-indigo-600 to-purple-700 rounded-t-3xl -mx-6 -mt-6 px-6 pt-6 pb-4 mb-4">
+        <div
+          class="box-header bg-gradient-to-br from-indigo-600 to-purple-700 rounded-t-3xl -mx-6 -mt-6 px-6 pt-6 pb-4 mb-4"
+        >
           <div class="flex items-center gap-4">
-            <div class="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center text-3xl">
+            <div
+              class="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center text-3xl"
+            >
               📦
             </div>
             <div class="box-title-section">
               <h3 class="box-title text-white text-xl font-bold">{{ selectedBox.name }}</h3>
-              <p class="text-sm text-white/80 mb-1">👤 {{ selectedBox.collector_id || 'Неизвестный' }}</p>
-              <p class="box-subtitle text-white/70 text-sm">{{ formatDate(selectedBox.createdAt) }}</p>
+              <p class="text-sm text-white/80 mb-1">
+                👤 {{ selectedBox.collector_id || 'Неизвестный' }}
+              </p>
+              <p class="box-subtitle text-white/70 text-sm">
+                {{ formatDate(selectedBox.createdAt) }}
+              </p>
             </div>
           </div>
         </div>
@@ -731,18 +858,24 @@ function formatDate(dateString) {
         <!-- Статистика -->
         <div class="box-stats grid grid-cols-2 gap-4 mb-4">
           <div class="stat-item bg-slate-800/50 rounded-xl p-4 text-center">
-            <span class="stat-value text-3xl font-bold text-amber-400">{{ selectedBox.items.length }}</span>
+            <span class="stat-value text-3xl font-bold text-amber-400">{{
+              selectedBox.items.length
+            }}</span>
             <p class="stat-label text-xs text-slate-400 mt-1">товаров</p>
           </div>
           <div class="stat-item bg-slate-800/50 rounded-xl p-4 text-center">
-            <span class="stat-value text-3xl font-bold text-primary-400">#{{ selectedBox.number }}</span>
+            <span class="stat-value text-3xl font-bold text-primary-400"
+              >#{{ selectedBox.number }}</span
+            >
             <p class="stat-label text-xs text-slate-400 mt-1">номер короба</p>
           </div>
         </div>
 
         <!-- Список товаров -->
         <div class="items-section mb-4">
-          <div class="section-title flex items-center gap-2 text-base font-semibold text-slate-100 mb-3">
+          <div
+            class="section-title flex items-center gap-2 text-base font-semibold text-slate-100 mb-3"
+          >
             <van-icon name="bag-o" class="text-primary-400" />
             Содержимое
           </div>
@@ -753,11 +886,15 @@ function formatDate(dateString) {
               :key="index"
               class="item-card bg-slate-800/50 rounded-xl p-3 flex items-start gap-3"
             >
-              <div class="w-8 h-8 rounded-lg bg-primary-500/20 border border-primary-500/30 flex items-center justify-center flex-shrink-0">
+              <div
+                class="w-8 h-8 rounded-lg bg-primary-500/20 border border-primary-500/30 flex items-center justify-center flex-shrink-0"
+              >
                 <span class="text-xs font-bold text-primary-400">{{ index + 1 }}</span>
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-xs font-mono text-primary-400 bg-primary-500/10 px-2 py-0.5 rounded-md inline-block mb-1">
+                <p
+                  class="text-xs font-mono text-primary-400 bg-primary-500/10 px-2 py-0.5 rounded-md inline-block mb-1"
+                >
                   {{ item.number }}
                 </p>
                 <p class="text-sm font-medium text-slate-100 truncate">{{ item.name }}</p>

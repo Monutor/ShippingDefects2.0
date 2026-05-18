@@ -17,7 +17,9 @@ function getToken() {
     const user = JSON.parse(userStr)
     return user.token || null
   } catch (e) {
-    try { localStorage.removeItem('warehouse-brain-user') } catch {}
+    try {
+      localStorage.removeItem('warehouse-brain-user')
+    } catch {}
     return null
   }
 }
@@ -26,7 +28,7 @@ function getToken() {
 function authHeaders() {
   return {
     'Content-Type': 'application/json',
-    ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+    ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {})
   }
 }
 
@@ -41,13 +43,15 @@ async function request(url, options = {}) {
   const res = await fetch(fullUrl, {
     ...options,
     signal: options.signal,
-    headers: { ...authHeaders(), ...(options.headers || {}) },
+    headers: { ...authHeaders(), ...(options.headers || {}) }
   })
 
   // Читаем body один раз — затем пробуем распарсить как JSON
   const rawText = await res.text()
   let data = null
-  try { data = JSON.parse(rawText) } catch {}
+  try {
+    data = JSON.parse(rawText)
+  } catch {}
 
   if (!res.ok) {
     // Если 401 — токен истёк или невалидный: очищаем сессию и перенаправляем на login
@@ -57,9 +61,9 @@ async function request(url, options = {}) {
       if (userStr) {
         try {
           const user = JSON.parse(userStr)
-            // Проверяем, не истёк ли токен (JWT expires in: 1d)
-            if (user.authenticatedAt && user.token) {
-              const expiredAt = new Date(user.authenticatedAt).getTime() + 1 * 24 * 60 * 60 * 1000
+          // Проверяем, не истёк ли токен (JWT expires in: 1d)
+          if (user.authenticatedAt && user.token) {
+            const expiredAt = new Date(user.authenticatedAt).getTime() + 1 * 24 * 60 * 60 * 1000
             tokenExpired = Date.now() > expiredAt
           } else {
             // Нет authenticatedAt или token — данные повреждены, очищаем
@@ -74,7 +78,7 @@ async function request(url, options = {}) {
 
       // Перенаправляем на login только если токен истёк
       if (tokenExpired && !window._isNavigatingToLogin) {
-        window._isNavigatingToLogin = true  // P1 fix: мьютекс для навигации на login
+        window._isNavigatingToLogin = true // P1 fix: мьютекс для навигации на login
         try {
           const module = await import('vue-router')
           if (typeof window.$router !== 'undefined' && typeof window.$router.push === 'function') {
@@ -82,14 +86,18 @@ async function request(url, options = {}) {
           } else {
             window.location.href = '/login'
           }
-        } catch {}
-        finally {
+        } catch {
+        } finally {
           // Сброс мьютекса в любом случае — предотвращаем блокировку будущих 401 редиректов
-          setTimeout(() => { window._isNavigatingToLogin = false }, 5000)
+          setTimeout(() => {
+            window._isNavigatingToLogin = false
+          }, 5000)
         }
       } else {
         // P1 fix: сброс мьютекса через 5 секунд после навигации
-        setTimeout(() => { window._isNavigatingToLogin = false }, 5000)
+        setTimeout(() => {
+          window._isNavigatingToLogin = false
+        }, 5000)
       }
 
       // Если токен истёк — не продолжаем запрос, возвращаем ошибку auth
@@ -98,8 +106,14 @@ async function request(url, options = {}) {
       }
     }
 
-    const errorText = data ? (data?.error || data?.message || null) : rawText || null
-    return { error: { code: res.status, message: data?.error || data?.message || `HTTP ${res.status}`, detail: data || errorText } }
+    const errorText = data ? data?.error || data?.message || null : rawText || null
+    return {
+      error: {
+        code: res.status,
+        message: data?.error || data?.message || `HTTP ${res.status}`,
+        detail: data || errorText
+      }
+    }
   }
 
   return { data, error: null }
@@ -136,8 +150,10 @@ export const auth = {
       if (!userStr) return null
       const user = JSON.parse(userStr)
       return user.employeeId || user.id || null
-    } catch { return null }
-  },
+    } catch {
+      return null
+    }
+  }
 }
 
 /* ============================================================
@@ -154,7 +170,7 @@ export const db = {
     },
     async clearAll() {
       return request('/api/brain', { method: 'DELETE' })
-    },
+    }
   },
 
   /* ---- Boxes ---- */
@@ -166,13 +182,18 @@ export const db = {
       const result = await request(`/api/boxes/${boxId}`)
       // GET /api/boxes возвращает массив — берём первый элемент с нужным ID
       if (result?.data && Array.isArray(result.data)) {
-        const found = result.data.find(b => b.id === boxId || b.box_id === boxId)
-        return found ? { data: found, error: null } : { data: null, error: { message: 'Not found' } }
+        const found = result.data.find((b) => b.id === boxId || b.box_id === boxId)
+        return found
+          ? { data: found, error: null }
+          : { data: null, error: { message: 'Not found' } }
       }
       return result
     },
     async create(collectorId) {
-      return request('/api/boxes', { method: 'POST', body: JSON.stringify({ collector_id: collectorId }) })
+      return request('/api/boxes', {
+        method: 'POST',
+        body: JSON.stringify({ collector_id: collectorId })
+      })
     },
     async update(boxId, payload) {
       return request(`/api/boxes/${boxId}`, { method: 'PUT', body: JSON.stringify(payload) })
@@ -183,7 +204,7 @@ export const db = {
     async clearAllFinished({ active = false } = {}) {
       const qs = active ? '?active=true' : ''
       return request(`/api/boxes${qs}`, { method: 'DELETE' })
-    },
+    }
   },
 
   /* ---- Box Items (товары внутри короба) ---- */
@@ -193,11 +214,17 @@ export const db = {
     },
     addItem(boxId, itemData) {
       // BUG-4 fix: прямой метод для добавления товара в короб (используется flushPendingOfflineBoxItems)
-      return request(`/api/boxes/${boxId}`, { method: 'PUT', body: JSON.stringify({ item: itemData }) })
+      return request(`/api/boxes/${boxId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ item: itemData })
+      })
     },
     deleteItem(boxId, barcode) {
-      return request(`/api/boxes/box-items?box_id=${boxId}&barcode=${encodeURIComponent(barcode)}`, { method: 'DELETE' })
-    },
+      return request(
+        `/api/boxes/box-items?box_id=${boxId}&barcode=${encodeURIComponent(barcode)}`,
+        { method: 'DELETE' }
+      )
+    }
   },
 
   /* ---- Separate Items (независимые товары) ---- */
@@ -216,15 +243,18 @@ export const db = {
     },
     async clearAll() {
       return request('/api/separate', { method: 'DELETE' })
-    },
+    }
   },
 
   /* ---- Collector Profiles (sync to backend) ---- */
   collectorProfiles: {
     /** Sync profile to backend after login/register */
     async sync(employeeId, data) {
-      return request(`/api/auth/profile/${employeeId}`, { method: 'PUT', body: JSON.stringify(data) })
-    },
+      return request(`/api/auth/profile/${employeeId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      })
+    }
   },
 
   /* ---- Scan History (batched) ---- */
@@ -232,7 +262,7 @@ export const db = {
     /** Batch log scans */
     async logBatch(scans) {
       return request('/api/scan-history/batch', { method: 'POST', body: JSON.stringify({ scans }) })
-    },
+    }
   },
 
   /* ---- Pallets ---- */
@@ -241,7 +271,10 @@ export const db = {
       return request('/api/pallets')
     },
     async create(collectorId) {
-      return request('/api/pallets', { method: 'POST', body: JSON.stringify({ collector_id: collectorId }) })
+      return request('/api/pallets', {
+        method: 'POST',
+        body: JSON.stringify({ collector_id: collectorId })
+      })
     },
     async update(palletId, payload) {
       return request(`/api/pallets/${palletId}`, { method: 'PUT', body: JSON.stringify(payload) })
@@ -251,7 +284,7 @@ export const db = {
     },
     async clearAll() {
       return request('/api/pallets/all', { method: 'DELETE' })
-    },
+    }
   },
 
   /* ---- Pallet Items (содержимое паллета) ---- */
@@ -272,7 +305,7 @@ export const db = {
       }
       return request(`/api/pallets/${palletId}/items`, {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify(body)
       })
     },
 
@@ -280,18 +313,21 @@ export const db = {
     async create(palletId, sourceType, sourceId) {
       return request(`/api/pallets/${palletId}/items`, {
         method: 'POST',
-        body: JSON.stringify({ source_type: sourceType, source_id: sourceId }),
+        body: JSON.stringify({ source_type: sourceType, source_id: sourceId })
       })
     },
 
     /** Удалить item из паллета */
     async delete(palletId, sourceType, sourceId) {
       // Используем query params для удаления конкретного товара по source_type и source_id
-      return request(`/api/pallets/${palletId}/items?source_type=${encodeURIComponent(sourceType)}&source_id=${encodeURIComponent(sourceId)}`, {
-        method: 'DELETE',
-      })
-    },
-  },
+      return request(
+        `/api/pallets/${palletId}/items?source_type=${encodeURIComponent(sourceType)}&source_id=${encodeURIComponent(sourceId)}`,
+        {
+          method: 'DELETE'
+        }
+      )
+    }
+  }
 }
 
 /* ============================================================
@@ -306,7 +342,7 @@ export const maintenance = {
   /** Save toggle to backend */
   save(isEnabled) {
     return request('/api/maintenance', { method: 'PUT', body: JSON.stringify({ isEnabled }) })
-  },
+  }
 }
 
 /* ============================================================
@@ -328,21 +364,21 @@ function buildWsUrl() {
 const WS_URL = buildWsUrl()
 let _socket = null
 const _listeners = new Map() // eventName → Set<fn>
-let _wsReconnectCount = 0  // L2 fix: счётчик для экспоненциального backoff
-const WS_RECONNECT_BASE_MS = 1000   // 1 сек
-const WS_RECONNECT_MAX_MS = 60000   // 60 сек
-let _isConnecting = false            // C5 fix: блокировка повторного connect
-let _authFailed = false              // P0 fix: блокируем reconnect при ошибке авторизации
-let isDisconnecting = false          // P2 fix: блокируем reconnect после logout
+let _wsReconnectCount = 0 // L2 fix: счётчик для экспоненциального backoff
+const WS_RECONNECT_BASE_MS = 1000 // 1 сек
+const WS_RECONNECT_MAX_MS = 60000 // 60 сек
+let _isConnecting = false // C5 fix: блокировка повторного connect
+let _authFailed = false // P0 fix: блокируем reconnect при ошибке авторизации
+let isDisconnecting = false // P2 fix: блокируем reconnect после logout
 
 function _connectWithToken(token) {
   // Guard от duplicate connections и race conditions при быстром multiple вызове
   if (_socket && _socket.readyState === WebSocket.OPEN) return _socket
   if (_isConnecting || !token) return null
   _isConnecting = true
-  
+
   try {
-    const url = WS_URL  // C2 fix: НЕ слать токен в URL — утечка через логи/proxy/history
+    const url = WS_URL // C2 fix: НЕ слать токен в URL — утечка через логи/proxy/history
     _socket = new WebSocket(url)
 
     let authReceived = false
@@ -360,7 +396,7 @@ function _connectWithToken(token) {
             _socket.send(JSON.stringify({ type: 'init_request' }))
             return
           } else if (msg.type === 'auth_result' && !msg.success) {
-            _authFailed = true  // P0 fix: блокируем reconnect при ошибке auth
+            _authFailed = true // P0 fix: блокируем reconnect при ошибке auth
             _socket.close(4003, msg.message || 'Auth failed')
             return
           }
@@ -372,13 +408,18 @@ function _connectWithToken(token) {
         } catch {}
       }
     }
-    _socket.onerror = () => { _isConnecting = false }
+    _socket.onerror = () => {
+      _isConnecting = false
+    }
     _socket.onclose = () => {
       _isConnecting = false
       // P0 fix: не reconnect при ошибке авторизации
       if (_authFailed) return
 
-      const delayMs = Math.min(WS_RECONNECT_BASE_MS * Math.pow(2, _wsReconnectCount), WS_RECONNECT_MAX_MS)
+      const delayMs = Math.min(
+        WS_RECONNECT_BASE_MS * Math.pow(2, _wsReconnectCount),
+        WS_RECONNECT_MAX_MS
+      )
       setTimeout(() => {
         const t = getToken()
         if (t) _connectWithToken(t)
@@ -402,10 +443,10 @@ export const ws = {
   /** BUG-9 fix: reconnect — если WS был подключён но упал при logout/login, переподключится при новом login */
   triggerReconnect() {
     const token = getToken()
-    if (!token || isDisconnecting) return null  // P2 fix: не reconnect после logout
+    if (!token || isDisconnecting) return null // P2 fix: не reconnect после logout
     // Если сокет закрыт или нетокен — принудительно переподключаемся
     if (!_socket || _socket.readyState !== WebSocket.OPEN) {
-      _wsReconnectCount = 0  // сбросим backoff при явном trigger
+      _wsReconnectCount = 0 // сбросим backoff при явном trigger
       return _connectWithToken(token)
     }
     return _socket
@@ -413,8 +454,11 @@ export const ws = {
 
   /** Отключить WebSocket */
   disconnect() {
-    isDisconnecting = true  // P2 fix: блокируем reconnect после logout
-    if (_socket) { _socket.close(); _socket = null }
+    isDisconnecting = true // P2 fix: блокируем reconnect после logout
+    if (_socket) {
+      _socket.close()
+      _socket = null
+    }
   },
 
   /** Подписаться на событие (возвращает unsubscribe) */
@@ -425,22 +469,30 @@ export const ws = {
     this.connect()
     return () => {
       const fns = _listeners.get(event)
-      if (fns) { fns.delete(callback); if (fns.size === 0) _listeners.delete(event) }
+      if (fns) {
+        fns.delete(callback)
+        if (fns.size === 0) _listeners.delete(event)
+      }
     }
   },
 
   /** Отписаться от события */
   off(event, callback) {
     const fns = _listeners.get(event)
-    if (fns) { fns.delete(callback); if (fns.size === 0) _listeners.delete(event) }
+    if (fns) {
+      fns.delete(callback)
+      if (fns.size === 0) _listeners.delete(event)
+    }
   },
 
   /** Отправить сообщение на сервер */
   send(type, payload = {}) {
     if (!_socket || _socket.readyState !== WebSocket.OPEN) return false
-    try { _socket.send(JSON.stringify({ type, ...payload })) } catch {}
+    try {
+      _socket.send(JSON.stringify({ type, ...payload }))
+    } catch {}
     return true
-  },
+  }
 }
 
 /* Default export */

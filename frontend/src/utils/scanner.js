@@ -1,4 +1,4 @@
-import { Html5Qrcode } from 'html5-qrcode'
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 
 /**
  * Класс-обёртка для работы со сканером штрихкодов
@@ -33,10 +33,23 @@ export class BarcodeScanner {
     }
 
     const defaultConfig = {
-      fps: 10,
-      qrbox: { width: 250, height: 250 },
+      fps: 25,
+      qrbox: { width: 300, height: 300 },
       aspectRatio: 1.0,
-      disableFlip: false
+      disableFlip: false,
+      showTorchButtonIfSupported: true,
+      formats: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.CODE_93,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.CODABAR,
+        Html5QrcodeSupportedFormats.QR_CODE
+      ]
     }
 
     const mergedConfig = { ...defaultConfig, ...config }
@@ -56,12 +69,10 @@ export class BarcodeScanner {
           this.stop()
           onScanSuccess(decodedText, decodedResult)
         },
-        (errorMessage) => {
-        }
+        (errorMessage) => {}
       )
       this.isScanning = true
     } catch (error) {
-      
       // Пробуем альтернативный способ - по deviceId
       if (error.message?.includes('Permission') || error.message?.includes('NotAllowed')) {
         throw new Error('Нет доступа к камере. Разрешите доступ в настройках браузера.')
@@ -100,8 +111,7 @@ export class BarcodeScanner {
           await this.scanner.stop()
         }
         await this.scanner.clear()
-      } catch (error) {
-      }
+      } catch (error) {}
       this.scanner = null
       this.isScanning = false
     }
@@ -110,21 +120,18 @@ export class BarcodeScanner {
 
 /**
  * Фабричная функция для создания экземпляра сканера
- * @param {string|Object} options - ID элемента или объект { elementId, onScan, onError }
+ * @param {string|Object} options - ID элемента или объект { elementId }
  * @returns {BarcodeScanner}
  */
 export function createScanner(options) {
   const scanner = new BarcodeScanner()
-  
+
   if (typeof options === 'string') {
     scanner.init(options)
   } else {
     scanner.init(options.elementId)
-    if (options.onScan || options.onError) {
-      scanner.start(options.onScan, options.onError)
-    }
   }
-  
+
   return scanner
 }
 
@@ -135,7 +142,12 @@ export function createScanner(options) {
 export async function checkCameraSupport() {
   // BUG-233 fix: разрешаем http://192.168.*.* для локальной сети
   const isLocalNetwork = window.location.hostname.match(/^192\.168\.\d+\.\d+$/)
-  if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1' && !isLocalNetwork) {
+  if (
+    window.location.protocol !== 'https:' &&
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1' &&
+    !isLocalNetwork
+  ) {
     return false
   }
 
@@ -146,8 +158,10 @@ export async function checkCameraSupport() {
 
   // Пробуем получить доступ к камере
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-    stream.getTracks().forEach(track => track.stop())
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    })
+    stream.getTracks().forEach((track) => track.stop())
     return true
   } catch {
     return false

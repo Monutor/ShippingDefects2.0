@@ -6,8 +6,11 @@ import { parseBarcodeToBrainNumber } from '@/utils/barcode'
 
 /** Safe deep clone — избегает ошибок при circular references */
 function safeDeepClone(obj) {
-  try { return JSON.parse(JSON.stringify(obj)) }
-  catch { return structuredClone(obj) }
+  try {
+    return JSON.parse(JSON.stringify(obj))
+  } catch {
+    return structuredClone(obj)
+  }
 }
 
 /**
@@ -43,7 +46,9 @@ export const usePalletStore = defineStore('pallet', () => {
   ============================================================ */
   const canUndo = computed(() => currentPallet.value && actionHistory.value.length > 0)
   const totalPallets = computed(() => pallets.value.length)
-  const currentPalletItemCount = computed(() => currentPallet.value ? currentPallet.value.items.length : 0)
+  const currentPalletItemCount = computed(() =>
+    currentPallet.value ? currentPallet.value.items.length : 0
+  )
   const hasAvailableBoxes = computed(() => availableBoxes.value.length > 0)
   const hasAvailableSeparateItems = computed(() => availableSeparateItems.value.length > 0)
 
@@ -57,8 +62,8 @@ export const usePalletStore = defineStore('pallet', () => {
       if (result.error) return []
 
       pallets.value = (result.data || [])
-        .filter(p => p.status === 'finished')
-        .map(p => ({
+        .filter((p) => p.status === 'finished')
+        .map((p) => ({
           id: p.id,
           number: p.pallet_number || 0,
           name: p.name || `Паллет ${p.pallet_number}`,
@@ -67,24 +72,30 @@ export const usePalletStore = defineStore('pallet', () => {
           status: p.status,
           createdAt: p.created_at,
           finishedAt: p.finished_at,
-          items: [],
+          items: []
         }))
 
       // BUG-240 fix: параллельная загрузка items через Promise.all
-      await Promise.all(pallets.value.map(async (pallet) => {
-        if (pallet.status === 'finished') {
-          try {
-            const itemsResult = await db.palletItems.getByPalletId(pallet.id)
-            const allItems = itemsResult.data || []
-            pallet.items = allItems
-            pallet.boxCount = allItems.filter(i => i.source_type === 'box').length
-            pallet.separateItemCount = allItems.filter(i => i.source_type === 'separate_item').length
-            pallet.inlineCount = allItems.filter(i => i.source_type === 'pallet' || i.source_type === 'inline').length
-          } catch {
-            // ignore
+      await Promise.all(
+        pallets.value.map(async (pallet) => {
+          if (pallet.status === 'finished') {
+            try {
+              const itemsResult = await db.palletItems.getByPalletId(pallet.id)
+              const allItems = itemsResult.data || []
+              pallet.items = allItems
+              pallet.boxCount = allItems.filter((i) => i.source_type === 'box').length
+              pallet.separateItemCount = allItems.filter(
+                (i) => i.source_type === 'separate_item'
+              ).length
+              pallet.inlineCount = allItems.filter(
+                (i) => i.source_type === 'pallet' || i.source_type === 'inline'
+              ).length
+            } catch {
+              // ignore
+            }
           }
-        }
-      }))
+        })
+      )
       return pallets.value
     } catch {
       return []
@@ -93,20 +104,26 @@ export const usePalletStore = defineStore('pallet', () => {
 
   async function loadAvailableBoxes() {
     try {
-      if (!navigator.onLine) { availableBoxes.value = []; return [] }
+      if (!navigator.onLine) {
+        availableBoxes.value = []
+        return []
+      }
       const result = await db.boxes.getAll()
-      if (result.error) { availableBoxes.value = []; return [] }
+      if (result.error) {
+        availableBoxes.value = []
+        return []
+      }
 
-      const finishedBoxes = (result.data || []).filter(b => b.status === 'finished')
+      const finishedBoxes = (result.data || []).filter((b) => b.status === 'finished')
       // Lazy load: не грузим items для всех доступных коробов — только базовые данные
-      availableBoxes.value = finishedBoxes.map(box => ({
+      availableBoxes.value = finishedBoxes.map((box) => ({
         id: box.id,
         number: box.box_number || 0,
         name: box.name || `Микс ${box.box_number}`,
         collector_id: box.collector_id,
-        itemCount: null,    // загружается при клике на короб
+        itemCount: null, // загружается при клике на короб
         itemsLoaded: false,
-        items: []           // полная загрузка при выборе короба из списка
+        items: [] // полная загрузка при выборе короба из списка
       }))
       return availableBoxes.value
     } catch {
@@ -117,14 +134,14 @@ export const usePalletStore = defineStore('pallet', () => {
 
   /** Обновить items конкретного доступного короба (lazy load) */
   async function refreshAvailableBoxItems(boxId) {
-    const box = availableBoxes.value.find(b => b.id === boxId)
+    const box = availableBoxes.value.find((b) => b.id === boxId)
     if (!box || box.itemsLoaded) return box
 
     try {
       if (!navigator.onLine) return box
 
       const itemsResult = await db.boxItems.getByBoxId(boxId)
-      const items = (itemsResult.data || []).map(item => ({
+      const items = (itemsResult.data || []).map((item) => ({
         number: item.barcode,
         name: item.name,
         article: item.brand || '',
@@ -144,11 +161,17 @@ export const usePalletStore = defineStore('pallet', () => {
 
   async function loadAvailableSeparateItems() {
     try {
-      if (!navigator.onLine) { availableSeparateItems.value = []; return [] }
+      if (!navigator.onLine) {
+        availableSeparateItems.value = []
+        return []
+      }
       const result = await db.separateItems.getAll()
-      if (result.error) { availableSeparateItems.value = []; return [] }
+      if (result.error) {
+        availableSeparateItems.value = []
+        return []
+      }
 
-      availableSeparateItems.value = (result.data || []).map(item => ({
+      availableSeparateItems.value = (result.data || []).map((item) => ({
         id: item.id,
         number: item.barcode,
         name: item.name,
@@ -169,12 +192,12 @@ export const usePalletStore = defineStore('pallet', () => {
       if (result.error) return null
 
       // Убрали localStorage fallback — только сервер
-      const activePallets = (result.data || []).filter(p => p.status === 'active')
+      const activePallets = (result.data || []).filter((p) => p.status === 'active')
       if (activePallets.length === 0) return null
 
       const { useCollectorStore } = await import('@/stores/collector')
       const collectorStore = useCollectorStore()
-      const myPallets = activePallets.filter(p => p.collector_id === collectorStore.employeeId)
+      const myPallets = activePallets.filter((p) => p.collector_id === collectorStore.employeeId)
       myPallets.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       const myPallet = myPallets[0] || null
 
@@ -197,11 +220,10 @@ export const usePalletStore = defineStore('pallet', () => {
     try {
       const itemsResult = await db.palletItems.getByPalletId(pallet.id)
       if (itemsResult?.data) {
-        
         // Разделяем box items и остальные
-        const boxItems = itemsResult.data.filter(i => i.source_type === 'box')
-        const otherItems = itemsResult.data.filter(i => i.source_type !== 'box')
-        
+        const boxItems = itemsResult.data.filter((i) => i.source_type === 'box')
+        const otherItems = itemsResult.data.filter((i) => i.source_type !== 'box')
+
         // Загружаем items для каждого короба
         for (const boxRef of boxItems) {
           try {
@@ -209,8 +231,10 @@ export const usePalletStore = defineStore('pallet', () => {
             if (boxResult?.data) {
               const boxItemsResult = await db.boxItems.getByBoxId(boxRef.source_id)
               const boxItemsList = boxItemsResult?.data || []
-              
-              const undoId = crypto.randomUUID ? crypto.randomUUID() : `undo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+
+              const undoId = crypto.randomUUID
+                ? crypto.randomUUID()
+                : `undo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
               serverItems.push({
                 source_type: 'box',
                 source_id: boxRef.source_id,
@@ -222,28 +246,34 @@ export const usePalletStore = defineStore('pallet', () => {
                 _boxItemCount: boxItemsList.length
               })
             }
-          } catch (err) {
-          }
+          } catch (err) {}
         }
-        
+
         // Обрабатываем non-box items
         serverItems = serverItems.concat(
           otherItems
-            .map(i => {
-              const isTimestamp = typeof i.source_id === 'number' || 
-                                  (typeof i.source_id === 'string' && !isNaN(Number(i.source_id)) && Number(i.source_id) > 1700000000000)
-              
-              if (isTimestamp && (!i.item_name || i.item_name.trim() === '') && !i.item_barcode) return null
+            .map((i) => {
+              const isTimestamp =
+                typeof i.source_id === 'number' ||
+                (typeof i.source_id === 'string' &&
+                  !isNaN(Number(i.source_id)) &&
+                  Number(i.source_id) > 1700000000000)
 
-              const name = (i.item_name && i.item_name.trim()) ? i.item_name : `Товар ${i.source_id}`
+              if (isTimestamp && (!i.item_name || i.item_name.trim() === '') && !i.item_barcode)
+                return null
+
+              const name = i.item_name && i.item_name.trim() ? i.item_name : `Товар ${i.source_id}`
               return {
-                source_type: i.source_type === 'pallet' || i.source_type === 'inline' ? 'pallet' : i.source_type,
+                source_type:
+                  i.source_type === 'pallet' || i.source_type === 'inline'
+                    ? 'pallet'
+                    : i.source_type,
                 source_id: i.source_id,
                 originalSourceType: i.source_type,
                 barcode: i.item_barcode || '',
                 name: name,
-                article: (i.item_brand && i.item_brand.trim()) ? i.item_brand : '',
-                comment: (i.item_comment && i.item_comment.trim()) ? i.item_comment : '',
+                article: i.item_brand && i.item_brand.trim() ? i.item_brand : '',
+                comment: i.item_comment && i.item_comment.trim() ? i.item_comment : '',
                 scannedAt: i.scanned_at || ''
               }
             })
@@ -273,62 +303,73 @@ export const usePalletStore = defineStore('pallet', () => {
       const result = await db.pallets.getAll()
       if (result.error) return []
 
-      const activePallets = (result.data || []).filter(p => p.status === 'active')
+      const activePallets = (result.data || []).filter((p) => p.status === 'active')
       // BUG-236 fix: не очищаем currentPallet если он создан локально и ещё не синхронизирован
-      if (currentPallet.value && currentPallet.value.backendId && !activePallets.some(p => p.id === currentPallet.value.id)) {
+      if (
+        currentPallet.value &&
+        currentPallet.value.backendId &&
+        !activePallets.some((p) => p.id === currentPallet.value.id)
+      ) {
         currentPallet.value = null
       }
 
-      const palletsWithItems = await Promise.all(activePallets.map(async (pallet) => {
-        let serverItems = []
-        try {
-          const itemsResult = await db.palletItems.getByPalletId(pallet.id)
-          if (itemsResult?.data) {
-            serverItems = itemsResult.data
-              .filter(i => i.source_type !== 'box')
-              .map(i => {
-                // Backend возвращает поля с префиксом item_ для pallet/inline items
-                const isTimestamp = typeof i.source_id === 'number' ? (
-                  String(i.source_id).length >= 13 &&
-                  !isNaN(Number(i.source_id)) &&
-                  Number(i.source_id) > 1700000000000
-                ) : (
-                  typeof i.source_id === 'string' && /^\d{13,}$/.test(i.source_id) && !isNaN(Number(i.source_id)) && Number(i.source_id) > 1700000000000
-                )
+      const palletsWithItems = await Promise.all(
+        activePallets.map(async (pallet) => {
+          let serverItems = []
+          try {
+            const itemsResult = await db.palletItems.getByPalletId(pallet.id)
+            if (itemsResult?.data) {
+              serverItems = itemsResult.data
+                .filter((i) => i.source_type !== 'box')
+                .map((i) => {
+                  // Backend возвращает поля с префиксом item_ для pallet/inline items
+                  const isTimestamp =
+                    typeof i.source_id === 'number'
+                      ? String(i.source_id).length >= 13 &&
+                        !isNaN(Number(i.source_id)) &&
+                        Number(i.source_id) > 1700000000000
+                      : typeof i.source_id === 'string' &&
+                        /^\d{13,}$/.test(i.source_id) &&
+                        !isNaN(Number(i.source_id)) &&
+                        Number(i.source_id) > 1700000000000
 
-                // Не отбрасываем товары с numeric source_id если есть item_barcode (это barcode товара!)
-                const name = (i.item_name && i.item_name.trim()) ? i.item_name : null
+                  // Не отбрасываем товары с numeric source_id если есть item_barcode (это barcode товара!)
+                  const name = i.item_name && i.item_name.trim() ? i.item_name : null
 
-                if (isTimestamp && !name && !i.item_barcode) return null
+                  if (isTimestamp && !name && !i.item_barcode) return null
 
-                return {
-                  source_type: i.source_type === 'pallet' || i.source_type === 'inline' ? 'pallet' : i.source_type,
-                  source_id: i.source_id,
-                  barcode: i.item_barcode || '',
-                  name: name || `Товар ${i.source_id}`,
-                  article: (i.item_brand && i.item_brand.trim()) ? i.item_brand : '',
-                  comment: (i.item_comment && i.item_comment.trim()) ? i.item_comment : ''
+                  return {
+                    source_type:
+                      i.source_type === 'pallet' || i.source_type === 'inline'
+                        ? 'pallet'
+                        : i.source_type,
+                    source_id: i.source_id,
+                    barcode: i.item_barcode || '',
+                    name: name || `Товар ${i.source_id}`,
+                    article: i.item_brand && i.item_brand.trim() ? i.item_brand : '',
+                    comment: i.item_comment && i.item_comment.trim() ? i.item_comment : ''
+                  }
+                })
+                .filter(Boolean)
+
+              // FIX: НЕ обновляем currentPallet.items если пользователь только что добавил товар локально.
+              if (currentPallet.value && currentPallet.value.id === pallet.id) {
+                const localItemCount = currentPallet.value.items?.length || 0
+                const serverItemCount = serverItems.length
+
+                // Если локальные items > 0 и >= серверных — пользователь добавил товар, НЕ перезаписываем!
+                if (localItemCount > 0 && localItemCount >= serverItemCount) {
+                } else if (currentPallet.value.id === pallet.id && localItemCount === 0) {
+                  // Загружаем с сервера только если локально пусто — это нормальная загрузка
+                  currentPallet.value.items = serverItems
+                } else {
                 }
-              })
-              .filter(Boolean)
-
-            // FIX: НЕ обновляем currentPallet.items если пользователь только что добавил товар локально.
-            if (currentPallet.value && currentPallet.value.id === pallet.id) {
-              const localItemCount = currentPallet.value.items?.length || 0
-              const serverItemCount = serverItems.length
-
-              // Если локальные items > 0 и >= серверных — пользователь добавил товар, НЕ перезаписываем!
-              if (localItemCount > 0 && localItemCount >= serverItemCount) {
-              } else if (currentPallet.value.id === pallet.id && localItemCount === 0) {
-                // Загружаем с сервера только если локально пусто — это нормальная загрузка
-                currentPallet.value.items = serverItems
-              } else {
               }
             }
-          }
-        } catch {}
-        return { ...pallet, items: serverItems, createdAt: pallet.created_at }
-      }))
+          } catch {}
+          return { ...pallet, items: serverItems, createdAt: pallet.created_at }
+        })
+      )
       return palletsWithItems
     } catch {
       return []
@@ -368,7 +409,9 @@ export const usePalletStore = defineStore('pallet', () => {
 
   async function addBoxToPallet(box) {
     if (!currentPallet.value || !box.id) return false
-    const exists = currentPallet.value.items.some(i => i.source_type === 'box' && i.source_id === box.id)
+    const exists = currentPallet.value.items.some(
+      (i) => i.source_type === 'box' && i.source_id === box.id
+    )
     if (exists) return false
     let palletId = null
     if (!currentPallet.value.backendId) {
@@ -390,7 +433,9 @@ export const usePalletStore = defineStore('pallet', () => {
         return false
       }
     }
-    const undoId = crypto.randomUUID ? crypto.randomUUID() : `undo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    const undoId = crypto.randomUUID
+      ? crypto.randomUUID()
+      : `undo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
     const boxWithItems = {
       source_type: 'box',
       source_id: box.id,
@@ -410,7 +455,9 @@ export const usePalletStore = defineStore('pallet', () => {
 
   async function addSeparateItemToPallet(item) {
     if (!currentPallet.value || !item.id) return false
-    const exists = currentPallet.value.items.some(i => i.source_type === 'separate_item' && i.source_id === item.id)
+    const exists = currentPallet.value.items.some(
+      (i) => i.source_type === 'separate_item' && i.source_id === item.id
+    )
     if (exists) return false
     let palletId = null
     if (!currentPallet.value.backendId) {
@@ -429,9 +476,26 @@ export const usePalletStore = defineStore('pallet', () => {
         return false
       }
     }
-    const undoId = crypto.randomUUID ? crypto.randomUUID() : `undo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-    currentPallet.value.items.push({ source_type: 'separate_item', source_id: item.id, comment: item.comment || '', scannedAt: item.scannedAt || null, _undoId: undoId })
-    actionHistory.value.push({ type: 'add_item', item: { source_type: 'separate_item', source_id: item.id, comment: item.comment || '', scannedAt: item.scannedAt || null }, timestamp: Date.now() })
+    const undoId = crypto.randomUUID
+      ? crypto.randomUUID()
+      : `undo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    currentPallet.value.items.push({
+      source_type: 'separate_item',
+      source_id: item.id,
+      comment: item.comment || '',
+      scannedAt: item.scannedAt || null,
+      _undoId: undoId
+    })
+    actionHistory.value.push({
+      type: 'add_item',
+      item: {
+        source_type: 'separate_item',
+        source_id: item.id,
+        comment: item.comment || '',
+        scannedAt: item.scannedAt || null
+      },
+      timestamp: Date.now()
+    })
     if (actionHistory.value.length > 50) actionHistory.value.shift()
     triggerPalletItemsUpdate()
     return true
@@ -453,7 +517,11 @@ export const usePalletStore = defineStore('pallet', () => {
         const normalizedItemNumbers = new Set([item.barcode, itemParsed].filter(Boolean))
         for (const searchNum of searchNumbers) {
           if (normalizedItemNumbers.has(searchNum)) {
-            return { boxNumber: pallet.number || pallet.pallet_number, boxName: pallet.name, type: 'pallet' }
+            return {
+              boxNumber: pallet.number || pallet.pallet_number,
+              boxName: pallet.name,
+              type: 'pallet'
+            }
           }
         }
       }
@@ -466,7 +534,11 @@ export const usePalletStore = defineStore('pallet', () => {
         const normalizedItemNumbers = new Set([item.barcode, itemParsed].filter(Boolean))
         for (const searchNum of searchNumbers) {
           if (normalizedItemNumbers.has(searchNum)) {
-            return { boxNumber: currentPallet.value.number || '', boxName: 'текущий', type: 'pallet' }
+            return {
+              boxNumber: currentPallet.value.number || '',
+              boxName: 'текущий',
+              type: 'pallet'
+            }
           }
         }
       }
@@ -476,7 +548,7 @@ export const usePalletStore = defineStore('pallet', () => {
     try {
       const { useBoxesStore } = await import('@/stores/boxes')
       const boxesStore = useBoxesStore()
-      
+
       // Проверяем finished boxes
       for (const box of boxesStore.boxes) {
         if (!box.items) continue
@@ -498,7 +570,11 @@ export const usePalletStore = defineStore('pallet', () => {
           const normalizedItemNumbers = new Set([item.number, itemParsed].filter(Boolean))
           for (const searchNum of searchNumbers) {
             if (normalizedItemNumbers.has(searchNum)) {
-              return { boxNumber: boxesStore.currentBox.number, boxName: 'текущий микс', type: 'box' }
+              return {
+                boxNumber: boxesStore.currentBox.number,
+                boxName: 'текущий микс',
+                type: 'box'
+              }
             }
           }
         }
@@ -515,7 +591,7 @@ export const usePalletStore = defineStore('pallet', () => {
 
     // BUG fix: дубликат check по barcode И source_id — серверные items могут иметь пустой barcode но валидный source_id
     const parsedNumber = parseBarcodeToBrainNumber(itemData.number)
-    const exists = currentPallet.value.items.some(i => {
+    const exists = currentPallet.value.items.some((i) => {
       if (i.barcode === itemData.number) return true
       // Fallback: сравниваем source_id для inline items
       if (i.source_id && String(i.source_id) === itemData.number) return true
@@ -531,8 +607,9 @@ export const usePalletStore = defineStore('pallet', () => {
       if (result?.data) {
         const { useCollectorStore } = await import('@/stores/collector')
         const collectorStore = useCollectorStore()
-        const myActivePallets = (result.data || [])
-          .filter(p => p.status === 'active' && p.collector_id === collectorStore.employeeId)
+        const myActivePallets = (result.data || []).filter(
+          (p) => p.status === 'active' && p.collector_id === collectorStore.employeeId
+        )
         // P1 fix: сортируем по createdAt — берём самый свежий активный паллет
         myActivePallets.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         if (myActivePallets.length > 0) {
@@ -558,11 +635,14 @@ export const usePalletStore = defineStore('pallet', () => {
         // Передаём все поля напрямую для unified схемы
         serverResult = await db.palletItems.addInline(palletId, {
           ...itemData,
-          source_type: 'inline'  // унифицированный тип вместо 'pallet'
+          source_type: 'inline' // унифицированный тип вместо 'pallet'
         })
         if (serverResult?.error) {
           // Обработка дубликата — аналогично box_items duplicate handling
-          if (serverResult.error.code === 409 || /duplicate/i.test(serverResult.error.message || '')) {
+          if (
+            serverResult.error.code === 409 ||
+            /duplicate/i.test(serverResult.error.message || '')
+          ) {
             const palletInfo = serverResult.detail?.pallet_info || serverResult.pallet_info
             let msg = `⚠️ Товар уже в паллете: ${itemData.number}`
             if (palletInfo?.pallet_number) {
@@ -572,7 +652,9 @@ export const usePalletStore = defineStore('pallet', () => {
             // Возвращаем объект с деталями вместо false — чтобы caller показал правильный toast
             return { success: false, error: 'duplicate', pallet_info: palletInfo }
           } else {
-            window.showToast(`⚠️ Не удалось сохранить товар на сервере: ${serverResult.error.message}`)
+            window.showToast(
+              `⚠️ Не удалось сохранить товар на сервере: ${serverResult.error.message}`
+            )
           }
         }
       } catch (err) {
@@ -580,9 +662,11 @@ export const usePalletStore = defineStore('pallet', () => {
         serverResult = { error: true }
       }
     }
-    const undoId = crypto.randomUUID ? crypto.randomUUID() : `undo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    const undoId = crypto.randomUUID
+      ? crypto.randomUUID()
+      : `undo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
     const itemRef = {
-      source_type: 'inline',  // унифицированный тип вместо 'pallet'
+      source_type: 'inline', // унифицированный тип вместо 'pallet'
       source_id: itemData.number,
       barcode: itemData.number,
       name: itemData.name || '',
@@ -626,8 +710,8 @@ export const usePalletStore = defineStore('pallet', () => {
     if (!currentPallet.value || !currentPallet.value.items) return false
 
     // Находим товар по source_id (надёжнее чем по индексу)
-    const index = currentPallet.value.items.findIndex(i => 
-      i.source_id === item.source_id && i.source_type === item.source_type
+    const index = currentPallet.value.items.findIndex(
+      (i) => i.source_id === item.source_id && i.source_type === item.source_type
     )
     if (index === -1) return false
 
@@ -637,12 +721,23 @@ export const usePalletStore = defineStore('pallet', () => {
     currentPallet.value.items.splice(index, 1)
 
     // Синхронизация удаления на бэкенде
-    if (navigator.onLine && currentPallet.value.backendId && itemToRemove.source_type && itemToRemove.source_id) {
+    if (
+      navigator.onLine &&
+      currentPallet.value.backendId &&
+      itemToRemove.source_type &&
+      itemToRemove.source_id
+    ) {
       try {
         const st = itemToRemove.originalSourceType || itemToRemove.source_type
-        const result = await db.palletItems.delete(currentPallet.value.backendId, st, itemToRemove.source_id)
+        const result = await db.palletItems.delete(
+          currentPallet.value.backendId,
+          st,
+          itemToRemove.source_id
+        )
         if (result?.error || result?.success === false) {
-          window.showToast(`⚠️ Не удалось удалить товар с сервера: ${result.error || 'неизвестная ошибка'}`)
+          window.showToast(
+            `⚠️ Не удалось удалить товар с сервера: ${result.error || 'неизвестная ошибка'}`
+          )
           currentPallet.value.items.splice(index, 0, itemToRemove)
           return false
         }
@@ -666,17 +761,16 @@ export const usePalletStore = defineStore('pallet', () => {
     try {
       // Uбираем pre-check дедупликации — доверяем UNIQUE INDEX БД для защиты от race condition.
       // Обработка 23505 (UNIQUE violation) в catch блоке ниже гарантирует корректность.
-      const itemsToSend = currentPallet.value.items.map(i => ({
+      const itemsToSend = currentPallet.value.items.map((i) => ({
         source_type: i.source_type,
         source_id: i.source_id,
-        name: (i.name && i.name.trim()) ? i.name : `Товар ${i.source_id || ''}`,  // Fallback если имя пустое
+        name: i.name && i.name.trim() ? i.name : `Товар ${i.source_id || ''}`, // Fallback если имя пустое
         article: i.article || '',
         comment: i.comment || '',
         scanned_at: i.scannedAt || null
       }))
 
-      itemsToSend.forEach(item => {
-      })
+      itemsToSend.forEach((item) => {})
 
       if (navigator.onLine && currentPallet.value.backendId) {
         let result = null
@@ -743,11 +837,13 @@ export const usePalletStore = defineStore('pallet', () => {
         ...originalPallet,
         backendId: currentPallet.value.backendId,
         status: 'finished',
-        createdAt: backendResult?.created_at || backendResult?.createdAt || originalPallet.createdAt,
-        finishedAt: backendResult?.finished_at || backendResult?.finishedAt || originalPallet.finishedAt,
+        createdAt:
+          backendResult?.created_at || backendResult?.createdAt || originalPallet.createdAt,
+        finishedAt:
+          backendResult?.finished_at || backendResult?.finishedAt || originalPallet.finishedAt,
         seal: backendResult?.seal || null,
         palletId: backendResult?.palletId || currentPallet.value.id,
-        items: backendResult?.items || originalPallet.items  // ALWAYS use server data when available
+        items: backendResult?.items || originalPallet.items // ALWAYS use server data when available
       }
 
       pallets.value.push(finishedPallet)
@@ -765,20 +861,29 @@ export const usePalletStore = defineStore('pallet', () => {
 
     if (lastAction.type === 'add_item') {
       if (!lastAction.item) return null
-      
+
       // BUG-228 fix: ищем по source_type+source_id вместо _undoId (надёжнее при WS обновлениях)
-      const idx = currentPallet.value.items.findIndex(i =>
-        i.source_type === lastAction.item.source_type &&
-        i.source_id === lastAction.item.source_id
+      const idx = currentPallet.value.items.findIndex(
+        (i) =>
+          i.source_type === lastAction.item.source_type && i.source_id === lastAction.item.source_id
       )
       if (idx !== -1) {
         const itemToRemove = currentPallet.value.items[idx]
         currentPallet.value.items.splice(idx, 1)
 
         // Синхронизация удаления на бэкенде при undo
-        if (navigator.onLine && currentPallet.value.backendId && itemToRemove.source_type && itemToRemove.source_id) {
+        if (
+          navigator.onLine &&
+          currentPallet.value.backendId &&
+          itemToRemove.source_type &&
+          itemToRemove.source_id
+        ) {
           try {
-            const result = await db.palletItems.delete(currentPallet.value.backendId, itemToRemove.source_type, itemToRemove.source_id)
+            const result = await db.palletItems.delete(
+              currentPallet.value.backendId,
+              itemToRemove.source_type,
+              itemToRemove.source_id
+            )
             if (result?.error) {
               // Ошибка удаления — возвращаем товар обратно
               currentPallet.value.items.splice(idx, 0, itemToRemove)
@@ -860,18 +965,19 @@ export const usePalletStore = defineStore('pallet', () => {
       currentPallet.value = null
       return
     }
-    
+
     if (navigator.onLine) {
       const itemsToDelete = [...(currentPallet.value.items || [])]
       await Promise.all(
-        itemsToDelete.map(item => {
+        itemsToDelete.map((item) => {
           const st = item.originalSourceType || item.source_type
-          return db.palletItems.delete(currentPallet.value.backendId, st, item.source_id).catch(() => {
-          })
+          return db.palletItems
+            .delete(currentPallet.value.backendId, st, item.source_id)
+            .catch(() => {})
         })
       )
     }
-    
+
     currentPallet.value.items = []
   }
 
@@ -891,7 +997,7 @@ export const usePalletStore = defineStore('pallet', () => {
     triggerPalletItemsUpdate,
     createPallet,
     loadActivePallet,
-    loadActivePalletById,  // ← добавляем для использования извне (ScanView.vue)
+    loadActivePalletById, // ← добавляем для использования извне (ScanView.vue)
     addBoxToPallet,
     addSeparateItemToPallet,
     addInlineItemToPallet,

@@ -6,6 +6,7 @@ import { useBoxesStore } from '@/stores/boxes'
 import { useCollectorStore } from '@/stores/collector'
 import { createScanner, checkCameraSupport } from '@/utils/scanner'
 import { parseBarcodeToBrainNumber, ensurePrefix } from '@/utils/barcode'
+import { initSounds, playSound } from '@/utils/sound'
 import { Button, Input, Badge, NavBar, Modal } from '@/components/ui'
 import { db, ws } from '@/lib/api.js'
 
@@ -18,8 +19,7 @@ const collectorStore = useCollectorStore()
 watch(
   () => boxesStore.currentBox?.items?.length,
   (newLength) => {
-    nextTick(() => {
-    })
+    nextTick(() => {})
   }
 )
 
@@ -37,13 +37,31 @@ const showStopItemModal = ref(false)
 const currentStopItem = ref(null)
 const showFinishModal = ref(false)
 
+// Модальное окно удаления товара
+const showRemoveModal = ref(false)
+const removeItemRef = ref(null)
+
+function requestRemoveItem(item) {
+  removeItemRef.value = item
+  showRemoveModal.value = true
+}
+
+async function confirmRemoveItem() {
+  if (removeItemRef.value) {
+    boxesStore.removeItemFromCurrentBox(removeItemRef.value)
+    window.showToast('Товар удалён')
+  }
+  showRemoveModal.value = false
+  removeItemRef.value = null
+}
+
 // Активные контейнеры
 const activeBoxes = ref([])
 const _allActiveBoxes = ref([])
 
 // WS обработчики
 function boxCreatedHandler(msg) {
-  if (msg.box_id && !_allActiveBoxes.value.find(b => b.id === msg.box_id)) {
+  if (msg.box_id && !_allActiveBoxes.value.find((b) => b.id === msg.box_id)) {
     const newBox = { id: msg.box_id, collector_id: msg.collector_id }
 
     if (msg.collector_id === collectorStore.employeeId) {
@@ -61,17 +79,17 @@ function boxFinishedHandler(msg) {
   if (boxesStore.currentBox?.id === msg.box_id) {
     boxesStore.currentBox = null
   }
-  activeBoxes.value = activeBoxes.value.filter(b => b.id !== msg.box_id)
-  _allActiveBoxes.value = _allActiveBoxes.value.filter(b => b.id !== msg.box_id)
+  activeBoxes.value = activeBoxes.value.filter((b) => b.id !== msg.box_id)
+  _allActiveBoxes.value = _allActiveBoxes.value.filter((b) => b.id !== msg.box_id)
 }
 
 // Загрузка активных контейнеров
 async function loadActiveContainers() {
   if (!navigator.onLine) return
 
-  const allBoxes = await boxesStore.loadAllActiveBoxes() || []
+  const allBoxes = (await boxesStore.loadAllActiveBoxes()) || []
 
-  activeBoxes.value = allBoxes.filter(b => b.collector_id === collectorStore.employeeId)
+  activeBoxes.value = allBoxes.filter((b) => b.collector_id === collectorStore.employeeId)
   _allActiveBoxes.value = allBoxes
 }
 
@@ -117,6 +135,8 @@ async function processScannedCode(barcode) {
   if (item?.comment && /не согласован|ждем согласования|ждем решения/i.test(item.comment)) {
     currentStopItem.value = item
     showStopItemModal.value = true
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100])
+    playSound('error')
     return null
   }
 
@@ -125,6 +145,8 @@ async function processScannedCode(barcode) {
 
   if (!normalizedBarcode) {
     window.showToast(`Неверный формат: ${barcode}`)
+    if (navigator.vibrate) navigator.vibrate([50, 30, 50])
+    playSound('error')
     return null
   }
 
@@ -132,23 +154,29 @@ async function processScannedCode(barcode) {
   const duplicateInOthers = boxesStore.checkGlobalDuplicate(normalizedBarcode)
   if (duplicateInOthers) {
     window.showToast(`️ Товар уже в миксе №${duplicateInOthers.boxNumber}`, 5000, 'error')
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100])
+    playSound('error')
     return null
   }
 
-  const result = await boxesStore.addItemToCurrentBox(item || { number: normalizedBarcode, name: `Товар ${normalizedBarcode}` })
+  const result = await boxesStore.addItemToCurrentBox(
+    item || { number: normalizedBarcode, name: `Товар ${normalizedBarcode}` }
+  )
   if (result.success) {
     window.showToast(`✅ Товар добавлен`, 1000, 'success')
     return { name: item?.name || `Товар ${normalizedBarcode}`, barcode }
   } else {
     if (result.error === 'duplicate_global') {
-      window.showToast(`⚠️ Товар уже в миксе №${result.boxNumber}`, 5000, 'error')
+      window.showToast(`️ Товар уже в миксе №${result.boxNumber}`, 5000, 'error')
     } else if (result.error === 'duplicate_server') {
       window.showToast(`⚠️ Товар уже в миксе №${result.boxNumber}`, 5000, 'error')
     } else if (result.error === 'duplicate_current') {
       window.showToast(`⚠️ Товар уже в текущем миксе`, 5000, 'error')
     } else {
-      window.showToast(`⚠️ Не удалось добавить товар`, 3000, 'error')
+      window.showToast(`️ Не удалось добавить товар`, 3000, 'error')
     }
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100])
+    playSound('error')
     return null
   }
 }
@@ -169,6 +197,8 @@ async function handleTsdInput() {
   }
 
   await processScannedCode(barcode)
+  if (navigator.vibrate) navigator.vibrate(50)
+  playSound('success')
   tsdInput.value = ''
   nextTick(() => {
     isProcessingScan.value = false // Сбрасываем после завершения processScannedCode
@@ -186,33 +216,33 @@ async function startScanner() {
 
   // Открываем модалку сканера
   showScanner.value = true
-  
+
   // Ждём пока модалка отрисуется и элемент появится в DOM
   await nextTick()
-  await new Promise(resolve => setTimeout(resolve, 300))
-  
+  await new Promise((resolve) => setTimeout(resolve, 300))
+
   if (!document.getElementById(scannerElementId)) {
     showScanner.value = false
     return
   }
 
   // Ждём завершения предыдущего перехода (html5-qrcode bug fix)
-  await new Promise(resolve => setTimeout(resolve, 500))
+  await new Promise((resolve) => setTimeout(resolve, 500))
 
+  initSounds()
   isScanning.value = true
-  scanner = createScanner({
-    elementId: scannerElementId,
-    onScan: async (barcode) => {
-      await processScannedCode(barcode)
-      showScanner.value = false
-      isScanning.value = false
-    },
-    onError: () => {
-      isScanning.value = false
-    }
-  })
+  const onScanSuccess = async (barcode) => {
+    if (navigator.vibrate) navigator.vibrate(50)
+    playSound('success')
+    await processScannedCode(barcode)
+    showScanner.value = false
+    isScanning.value = false
+  }
 
-  if (scanner.start) scanner.start()
+  scanner = createScanner({ elementId: scannerElementId })
+
+  // Запускаем сканирование после инициализации
+  scanner.start(onScanSuccess, {})
 }
 
 function stopScanner() {
@@ -266,6 +296,8 @@ function cancelBox() {
 async function performUndo() {
   const undoneItem = await boxesStore.undoLastAction()
   if (undoneItem) {
+    playSound('undo')
+    if (navigator.vibrate) navigator.vibrate([50, 30, 50])
     window.showToast(`Отменено: ${undoneItem.name || undoneItem.number}`, 2000, 'default')
   } else {
     window.showToast('Нечего отменять', 1500, 'error')
@@ -274,9 +306,7 @@ async function performUndo() {
 
 // Удаление товара из короба
 function removeItem(item) {
-  if (boxesStore.currentBox?.items) {
-    boxesStore.removeItemFromCurrentBox(boxesStore.currentBox.items.findIndex(i => i.number === item.number))
-  }
+  requestRemoveItem(item)
 }
 
 // Проверка владения текущим контейнером
@@ -288,16 +318,17 @@ const isContainerOwner = computed(() => {
 
 // Загрузка при монтировании
 onMounted(async () => {
+  initSounds()
   // Подписка на WS события
   ws.on('box_created', boxCreatedHandler)
   ws.on('box_finished', boxFinishedHandler)
-  
+
   // Загружаем все активные короба
   if (navigator.onLine) await loadActiveContainers()
 
   // BUG-218 fix: не выбираем чужой короб если свой не найден
   if (activeBoxes.value.length > 0 && !boxesStore.currentBox) {
-    const myBox = activeBoxes.value.find(b => b.collector_id === collectorStore.employeeId)
+    const myBox = activeBoxes.value.find((b) => b.collector_id === collectorStore.employeeId)
     if (myBox) {
       boxesStore.currentBox = myBox
     }
@@ -325,33 +356,51 @@ function handleKeyDown(event) {
 <template>
   <div class="mix-view bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
     <!-- Nav Bar -->
-    <NavBar 
-      title="Миксы" 
-      left-text="Назад" 
-      left-arrow 
-      @click-left="$router.back()"
+    <NavBar
+      title="Миксы"
+      left-text="Назад"
+      left-arrow
       :right-text="activeBoxes.length > 0 ? 'Смотреть' : 'Результаты'"
-      @click-right="activeBoxes.length > 0 ? $router.push({ path: '/mix', query: { id: activeBoxes[0].id } }) : $router.push('/boxes')"
+      @click-left="$router.back()"
+      @click-right="
+        activeBoxes.length > 0
+          ? $router.push({ path: '/mix', query: { id: activeBoxes[0].id } })
+          : $router.push('/boxes')
+      "
     />
 
     <!-- Основной контент -->
     <main class="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
       <!-- Статус бар -->
-      <div v-if="boxesStore.currentBox" class="status-bar bg-slate-800/80 border border-slate-700 rounded-2xl p-4 text-center">
+      <div
+        v-if="boxesStore.currentBox"
+        class="status-bar bg-slate-800/80 border border-slate-700 rounded-2xl p-4 text-center"
+      >
         <div class="flex items-center justify-center gap-3 mb-2">
           <Badge :count="boxesStore.currentBoxItemsCount" variant="info" />
-          <span class="text-slate-100 font-medium">{{ boxesStore.currentBox?.name || 'Микс не выбран' }}</span>
+          <span class="text-slate-100 font-medium">{{
+            boxesStore.currentBox?.name || 'Микс не выбран'
+          }}</span>
         </div>
       </div>
 
       <!-- Режим сканирования -->
       <!-- Пустое состояние — нет активного короба и нет активных коробов -->
-      <div v-if="!boxesStore.currentBox && activeBoxes.length === 0" class="absolute inset-0 flex flex-col items-center justify-center">
+      <div
+        v-if="!boxesStore.currentBox && activeBoxes.length === 0"
+        class="absolute inset-0 flex flex-col items-center justify-center"
+      >
         <button
-          @click="createAndSelectNewBox()"
           class="w-20 h-20 rounded-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 flex items-center justify-center transition-colors shadow-lg shadow-blue-600/30"
+          @click="createAndSelectNewBox()"
         >
-          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <svg
+            class="w-10 h-10 text-white"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            viewBox="0 0 24 24"
+          >
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
         </button>
@@ -359,12 +408,21 @@ function handleKeyDown(event) {
       </div>
 
       <!-- Пустое состояние — нет активного короба, но есть активные короба -->
-      <div v-if="!boxesStore.currentBox && activeBoxes.length > 0" class="flex flex-col items-center justify-center py-8">
+      <div
+        v-if="!boxesStore.currentBox && activeBoxes.length > 0"
+        class="flex flex-col items-center justify-center py-8"
+      >
         <button
-          @click="createAndSelectNewBox()"
           class="w-16 h-16 rounded-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 flex items-center justify-center transition-colors shadow-lg shadow-blue-600/30"
+          @click="createAndSelectNewBox()"
         >
-          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <svg
+            class="w-8 h-8 text-white"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            viewBox="0 0 24 24"
+          >
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
         </button>
@@ -372,12 +430,18 @@ function handleKeyDown(event) {
       </div>
 
       <!-- Список активных коробов -->
-      <div v-if="!boxesStore.currentBox && activeBoxes.length > 0" class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4">
+      <div
+        v-if="!boxesStore.currentBox && activeBoxes.length > 0"
+        class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4"
+      >
         <h3 class="font-semibold text-slate-100 mb-3">Или выберите существующий</h3>
         <div class="space-y-2 max-h-64 overflow-y-auto scrollbar-thin">
-          <div v-for="(box, idx) in activeBoxes" :key="'b' + box.id"
+          <div
+            v-for="box in activeBoxes"
+            :key="'b' + box.id"
+            class="item-row p-3 rounded-xl bg-slate-700/80 hover:bg-slate-600 cursor-pointer transition-colors"
             @click="selectBox(box)"
-            class="item-row p-3 rounded-xl bg-slate-700/80 hover:bg-slate-600 cursor-pointer transition-colors">
+          >
             <div class="flex items-center justify-between">
               <span class="text-sm font-medium text-slate-100">{{ box.name || 'Микс' }}</span>
               <span class="text-xs text-slate-400">Собиратель: {{ box.collector_id }}</span>
@@ -387,7 +451,10 @@ function handleKeyDown(event) {
       </div>
 
       <!-- Сканер -->
-      <div v-if="boxesStore.currentBox" class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4">
+      <div
+        v-if="boxesStore.currentBox"
+        class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4"
+      >
         <h3 class="font-semibold text-slate-100 mb-3 flex items-center gap-2">
           <van-icon name="scan" class="text-primary-400" />
           Сканирование
@@ -397,25 +464,25 @@ function handleKeyDown(event) {
         <div class="mode-switcher mb-4">
           <div class="grid grid-cols-2 gap-3">
             <button
-              @click="scanMode = 'tsd'"
               :class="[
                 'py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2',
                 scanMode === 'tsd'
                   ? 'bg-gradient-to-r from-primary-500 to-primary-700 text-white shadow-lg shadow-primary-500/30'
                   : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700'
               ]"
+              @click="scanMode = 'tsd'"
             >
               <img src="/img/bank-terminal.svg" alt="ТСД" class="w-5 h-5" />
               ТСД
             </button>
             <button
-              @click="scanMode = 'camera'"
               :class="[
                 'py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2',
                 scanMode === 'camera'
                   ? 'bg-gradient-to-r from-purple-500 to-purple-700 text-white shadow-lg shadow-purple-500/30'
                   : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700'
               ]"
+              @click="scanMode = 'camera'"
             >
               <img src="/img/camera-svg.svg" alt="Камера" class="w-5 h-5" />
               Камера
@@ -428,12 +495,14 @@ function handleKeyDown(event) {
           <Input
             v-model="tsdInput"
             placeholder="📱 Введите штрихкод и нажмите Enter"
-            @keyup.enter="handleTsdInput()"
             :disabled="isProcessingTsd"
             variant="primary"
             size="large"
+            @keyup.enter="handleTsdInput()"
           />
-          <p class="text-xs text-slate-400 mt-1 ml-2">💡 Введите номер товара (например 45328) — префикс добавится автоматически</p>
+          <p class="text-xs text-slate-400 mt-1 ml-2">
+            💡 Введите номер товара (например 45328) — префикс добавится автоматически
+          </p>
         </div>
 
         <!-- Камера режим -->
@@ -442,12 +511,17 @@ function handleKeyDown(event) {
             <van-icon :name="isScanning ? 'stop-circle-o' : 'scan'" size="20" />
             {{ isScanning ? 'Сканирование...' : 'Старт' }}
           </Button>
-          <p class="text-sm text-slate-500 mt-3 text-center">📷 Нажмите «Старт» для сканирования одного кода</p>
+          <p class="text-sm text-slate-500 mt-3 text-center">
+            📷 Нажмите «Старт» для сканирования одного кода
+          </p>
         </div>
       </div>
 
       <!-- Список товаров -->
-      <div v-if="boxesStore.currentBox" class="bg-slate-800/80 border border-slate-700 rounded-2xl overflow-hidden">
+      <div
+        v-if="boxesStore.currentBox"
+        class="bg-slate-800/80 border border-slate-700 rounded-2xl overflow-hidden"
+      >
         <div class="p-4 border-b border-slate-700">
           <h3 class="font-semibold text-slate-100 flex items-center gap-2">
             <van-icon name="bag-o" class="text-primary-400" />
@@ -456,7 +530,9 @@ function handleKeyDown(event) {
         </div>
         <div class="p-4 max-h-72 space-y-2 overflow-y-auto scrollbar-thin">
           <div v-if="boxesStore.currentBoxItemsCount === 0" class="text-center py-8">
-            <div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-3">
+            <div
+              class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-3"
+            >
               <van-icon name="bag-o" size="32" color="#64748b" />
             </div>
             <p class="text-slate-500 text-sm">Пока нет товаров. Отсканируйте штрихкод.</p>
@@ -466,11 +542,15 @@ function handleKeyDown(event) {
             v-for="(item, index) in boxesStore.currentBoxItemsReverse"
             :key="index"
             class="item-row p-3 rounded-xl transition-all duration-200 flex items-center gap-3"
-            :class="boxesStore.lastScannedItem?.number === item.number
-              ? 'bg-amber-500/20 border-2 border-amber-500'
-              : 'bg-slate-700/50 hover:bg-slate-700'"
+            :class="
+              boxesStore.lastScannedItem?.number === item.number
+                ? 'bg-amber-500/20 border-2 border-amber-500'
+                : 'bg-slate-700/50 hover:bg-slate-700'
+            "
           >
-            <div class="w-8 h-8 rounded-lg bg-primary-500/20 border border-primary-500/30 flex items-center justify-center flex-shrink-0">
+            <div
+              class="w-8 h-8 rounded-lg bg-primary-500/20 border border-primary-500/30 flex items-center justify-center flex-shrink-0"
+            >
               <span class="text-xs font-bold text-primary-400">{{ index + 1 }}</span>
             </div>
             <div class="flex-1 min-w-0">
@@ -478,7 +558,11 @@ function handleKeyDown(event) {
               <p class="text-xs text-slate-400 font-mono">{{ item.number }}</p>
               <p v-if="item.article" class="text-xs text-slate-500 mt-1">{{ item.article }}</p>
             </div>
-            <button v-if="isContainerOwner" @click="removeItem(item)" class="w-8 h-8 rounded-lg bg-red-500/20 border border-red-500/30 flex items-center justify-center flex-shrink-0 hover:bg-red-500/40 transition-colors">
+            <button
+              v-if="isContainerOwner"
+              class="w-8 h-8 rounded-lg bg-red-500/20 border border-red-500/30 flex items-center justify-center flex-shrink-0 hover:bg-red-500/40 transition-colors"
+              @click="removeItem(item)"
+            >
               <van-icon name="delete-o" size="16" color="#ef4444" />
             </button>
           </div>
@@ -491,21 +575,37 @@ function handleKeyDown(event) {
           <Button
             variant="secondary"
             :disabled="!boxesStore.canUndo"
-            @click="performUndo()"
             class="custom-btn-secondary"
+            @click="performUndo()"
           >
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            <svg
+              class="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+              />
             </svg>
             Отмена
           </Button>
-          <Button
-            variant="danger"
-            @click="cancelBox()"
-            class="custom-btn-danger"
-          >
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          <Button variant="danger" class="custom-btn-danger" @click="cancelBox()">
+            <svg
+              class="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
             Сброс
           </Button>
@@ -513,26 +613,36 @@ function handleKeyDown(event) {
             variant="success"
             :disabled="boxesStore.currentBoxItemsCount === 0"
             :class="boxesStore.currentBoxItemsCount === 0 ? 'opacity-50' : ''"
-            @click="finishBox()"
             class="custom-btn-success"
+            @click="finishBox()"
           >
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <svg
+              class="w-5 h-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
               <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
             </svg>
             Готово
           </Button>
         </div>
       </div>
-
     </main>
 
     <!-- Модальное окно сканера -->
     <Modal
       :model-value="showScanner"
-      @update:model-value="(val) => { showScanner = val; if (!val) stopScanner() }"
-      @confirm="handleStopScanner"
       confirm-text="Стоп"
       confirm-color="danger"
+      @update:model-value="
+        (val) => {
+          showScanner = val
+          if (!val) stopScanner()
+        }
+      "
+      @confirm="handleStopScanner"
     >
       <div class="text-center mb-4">
         <h3 class="font-semibold text-slate-100 mb-1">📷 Сканирование штрихкода</h3>
@@ -574,6 +684,21 @@ function handleKeyDown(event) {
           Этот товар нельзя отгружать в брак. Обратитесь к руководству для уточнения.
         </p>
       </div>
+    </Modal>
+
+    <!-- Модальное окно удаления товара -->
+    <Modal
+      v-model="showRemoveModal"
+      title="Удалить товар?"
+      show-cancel
+      confirm-text="Удалить"
+      cancel-text="Отмена"
+      confirm-color="danger"
+      @confirm="confirmRemoveItem"
+    >
+      <p class="text-slate-400 text-center">
+        {{ removeItemRef?.name }} ({{ removeItemRef?.number }})
+      </p>
     </Modal>
 
     <!-- Модальное окно подтверждения завершения -->
@@ -663,7 +788,12 @@ main {
 }
 
 @keyframes scan {
-  0%, 100% { top: 20%; }
-  50% { top: 78%; }
+  0%,
+  100% {
+    top: 20%;
+  }
+  50% {
+    top: 78%;
+  }
 }
 </style>

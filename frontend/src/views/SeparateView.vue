@@ -6,6 +6,7 @@ import { useSeparateStore } from '@/stores/separate'
 import { useCollectorStore } from '@/stores/collector'
 import { createScanner, checkCameraSupport } from '@/utils/scanner'
 import { parseBarcodeToBrainNumber, ensurePrefix } from '@/utils/barcode'
+import { initSounds, playSound } from '@/utils/sound'
 import { exportSeparateToExcel } from '@/utils/excel'
 import { Button, Input, Badge, NavBar, Modal, Loader } from '@/components/ui'
 
@@ -25,8 +26,6 @@ const isScanning = ref(false)
 const scannerElementId = 'barcode-scanner'
 let scanner = null
 
-const audioContext = ref(null)
-
 const showStopItemModal = ref(false)
 const currentStopItem = ref(null)
 const showDuplicateModal = ref(false)
@@ -42,7 +41,7 @@ function handleKeyDown(event) {
 async function performUndo() {
   const undoneItem = await separateStore.undoLastAction()
   if (undoneItem) {
-    playBeep(false)
+    playSound('undo')
     if (navigator.vibrate) navigator.vibrate([50, 30, 50])
     window.showToast(`↩ Отменено: ${undoneItem.name}`)
   } else {
@@ -51,6 +50,7 @@ async function performUndo() {
 }
 
 onMounted(async () => {
+  initSounds()
   const savedMode = localStorage.getItem('separateScanMode')
   if (savedMode === 'tsd' || savedMode === 'camera') scanMode.value = savedMode
 
@@ -81,26 +81,6 @@ watch(scanMode, (newMode, oldMode) => {
   window.showToast(`Режим: ${newMode === 'tsd' ? 'ТСД' : 'Камера'}`)
 })
 
-function initAudio() {
-  if (!audioContext.value) {
-    audioContext.value = new (window.AudioContext || window.webkitAudioContext)()
-  }
-}
-
-function playBeep(success = true) {
-  if (!audioContext.value) return
-  const oscillator = audioContext.value.createOscillator()
-  const gainNode = audioContext.value.createGain()
-  oscillator.connect(gainNode)
-  gainNode.connect(audioContext.value.destination)
-  oscillator.frequency.value = success ? 800 : 400
-  oscillator.type = 'sine'
-  gainNode.gain.setValueAtTime(0.3, audioContext.value.currentTime)
-  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.value.currentTime + 0.15)
-  oscillator.start(audioContext.value.currentTime)
-  oscillator.stop(audioContext.value.currentTime + 0.15)
-}
-
 async function startScanner() {
   if (isScanning.value) return
   const hasCameraSupport = await checkCameraSupport()
@@ -108,7 +88,6 @@ async function startScanner() {
     window.showToast('Камера недоступна. Требуется HTTPS и разрешение браузера.')
     return
   }
-  initAudio()
   try {
     showScanner.value = true
     await nextTick()
@@ -151,14 +130,14 @@ async function handleScanResult(result) {
   const item = brainStore.findByBarcode(finalBarcode)
 
   if (!item) {
-    playBeep(false)
+    playSound('error')
     if (navigator.vibrate) navigator.vibrate([50, 50, 50])
     window.showToast(`Товар отсутствует в БД: ${finalBarcode}`)
     return { success: false, error: 'not_found' }
   }
 
   if (brainStore.isStopItem(item)) {
-    playBeep(false)
+    playSound('error')
     if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100])
     currentStopItem.value = item
     showStopItemModal.value = true
@@ -167,7 +146,7 @@ async function handleScanResult(result) {
   }
 
   if (separateStore.isDuplicate(finalBarcode)) {
-    playBeep(false)
+    playSound('error')
     if (navigator.vibrate) navigator.vibrate([100, 50, 100])
     currentDuplicateItem.value = item
     showDuplicateModal.value = true
@@ -177,26 +156,26 @@ async function handleScanResult(result) {
 
   const result_add = await separateStore.addItem(item)
   if (result_add?.success) {
-    playBeep(true)
+    playSound('success')
     if (navigator.vibrate) navigator.vibrate([50, 30, 50])
     window.showToast(`✓ Добавлено: ${item.name}`)
     stopScanner()
     return { success: true }
   } else if (result_add?.error === 'duplicate') {
-    playBeep(false)
+    playSound('error')
     if (navigator.vibrate) navigator.vibrate([100, 50, 100])
     currentDuplicateItem.value = item
     showDuplicateModal.value = true
     stopScanner()
     return { success: false, error: 'duplicate' }
   } else {
-    playBeep(false)
+    playSound('error')
     window.showToast('Ошибка добавления')
     return { success: false, error: 'add_failed' }
   }
 }
 
-  async function handleTsdInput() {
+async function handleTsdInput() {
   if (isProcessingTsd.value) return
   let input = tsdInput.value?.trim()
   if (!input) return
@@ -226,7 +205,9 @@ async function handleScanResult(result) {
     }
   }
   tsdInput.value = ''
-  nextTick(() => { isProcessingTsd.value = false })
+  nextTick(() => {
+    isProcessingTsd.value = false
+  })
 }
 
 const showRemoveModal = ref(false)
@@ -288,30 +269,45 @@ async function confirmClear() {
 </script>
 
 <template>
-  <div class="separate-view min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 pb-20">
+  <div
+    class="separate-view min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 pb-20"
+  >
     <!-- Nav Bar -->
-    <NavBar title="Отдельные товары" left-text="Назад" left-arrow @click-left="$router.back()" right-text="Очистить"
-      :right-disabled="separateStore.totalItems === 0" @click-right="showClearModal = true" />
+    <NavBar
+      title="Отдельные товары"
+      left-text="Назад"
+      left-arrow
+      right-text="Очистить"
+      :right-disabled="separateStore.totalItems === 0"
+      @click-left="$router.back()"
+      @click-right="showClearModal = true"
+    />
 
     <main class="content px-4 py-4">
       <!-- Переключатель режимов -->
       <div class="mode-switcher mb-4">
         <div class="grid grid-cols-2 gap-3">
-          <button @click="scanMode = 'tsd'" :class="[
-            'py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2',
-            scanMode === 'tsd'
-              ? 'bg-gradient-to-r from-primary-500 to-primary-700 text-white shadow-lg shadow-primary-500/30'
-              : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700'
-          ]">
+          <button
+            :class="[
+              'py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2',
+              scanMode === 'tsd'
+                ? 'bg-gradient-to-r from-primary-500 to-primary-700 text-white shadow-lg shadow-primary-500/30'
+                : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700'
+            ]"
+            @click="scanMode = 'tsd'"
+          >
             <img src="/img/bank-terminal.svg" alt="ТСД" class="w-5 h-5" />
             ТСД
           </button>
-          <button @click="scanMode = 'camera'" :class="[
-            'py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2',
-            scanMode === 'camera'
-              ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30'
-              : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700'
-          ]">
+          <button
+            :class="[
+              'py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2',
+              scanMode === 'camera'
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30'
+                : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700'
+            ]"
+            @click="scanMode = 'camera'"
+          >
             <img src="/img/camera-svg.svg" alt="Камера" class="w-5 h-5" />
             Камера
           </button>
@@ -321,20 +317,32 @@ async function confirmClear() {
       <!-- Поле ввода для ТСД -->
       <div v-if="scanMode === 'tsd'" class="tsd-input-wrapper mb-4">
         <div class="flex items-center gap-2">
-          <Input v-model="tsdInput" placeholder="Сканируйте или введите номер" icon="scan" clearable
-            @keyup.enter="handleTsdInput" @change="handleTsdInput" @blur="handleTsdInput" class="flex-1" />
+          <Input
+            v-model="tsdInput"
+            placeholder="Сканируйте или введите номер"
+            icon="scan"
+            clearable
+            class="flex-1"
+            @keyup.enter="handleTsdInput"
+            @change="handleTsdInput"
+            @blur="handleTsdInput"
+          />
           <Button size="md" @click="handleTsdInput">Добавить</Button>
         </div>
-        <p class="text-xs text-slate-500 mt-2 ml-2">💡 Введите последние 5 цифр после слеша (187/xxxxx)</p>
+        <p class="text-xs text-slate-500 mt-2 ml-2">
+          💡 Введите последние 5 цифр после слеша (187/xxxxx)
+        </p>
       </div>
 
       <!-- Карточка информации -->
       <div class="info-card mb-4">
         <div
-          class="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-3 text-white shadow-lg shadow-emerald-500/20 border border-emerald-500/30">
+          class="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-3 text-white shadow-lg shadow-emerald-500/20 border border-emerald-500/30"
+        >
           <div class="flex items-center gap-4">
             <div
-              class="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center text-2xl flex-shrink-0">
+              class="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center text-2xl flex-shrink-0"
+            >
               🚚
             </div>
             <div class="flex-1">
@@ -350,12 +358,16 @@ async function confirmClear() {
 
       <!-- Кнопка сканирования -->
       <div v-if="scanMode === 'camera'" class="scan-section mb-4">
-        <Button :loading="isScanning" :class="[
-          'w-full py-4 rounded-2xl text-base font-semibold shadow-lg',
-          isScanning
-            ? 'bg-gradient-to-r from-rose-500 to-rose-700 shadow-rose-500/30'
-            : 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/30'
-        ]" @click="startScanner">
+        <Button
+          :loading="isScanning"
+          :class="[
+            'w-full py-4 rounded-2xl text-base font-semibold shadow-lg',
+            isScanning
+              ? 'bg-gradient-to-r from-rose-500 to-rose-700 shadow-rose-500/30'
+              : 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/30'
+          ]"
+          @click="startScanner"
+        >
           <van-icon :name="isScanning ? 'play-circle-o' : 'scan'" size="20" />
           {{ isScanning ? 'Сканирование...' : 'Старт' }}
         </Button>
@@ -364,7 +376,9 @@ async function confirmClear() {
 
       <!-- Список товаров -->
       <div class="items-list-section mb-4">
-        <div class="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl overflow-hidden">
+        <div
+          class="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl overflow-hidden"
+        >
           <div class="p-4 border-b border-slate-700">
             <h3 class="font-semibold text-slate-100 flex items-center gap-2">
               <van-icon name="bag-o" class="text-primary-400" />
@@ -376,36 +390,58 @@ async function confirmClear() {
             <Loader v-if="separateStore.isSyncing" text="Загрузка товаров..." />
 
             <div v-else-if="separateStore.totalItems === 0" class="text-center py-8">
-              <div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-3">
+              <div
+                class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-3"
+              >
                 <van-icon name="bag-o" size="32" color="#64748b" />
               </div>
               <p class="text-slate-400 text-sm">Пока нет товаров. Отсканируйте штрихкод.</p>
             </div>
             <div v-else class="items-list-detail space-y-2 max-h-96 overflow-y-auto scrollbar-thin">
-              <div v-for="(item, index) in separateStore.items" :key="index"
-                class="item-row p-3 rounded-xl transition-all duration-200" :class="separateStore.lastScannedItem?.number === item.number
-                  ? 'bg-amber-500/20 border-2 border-amber-500'
-                  : 'bg-slate-700/50 hover:bg-slate-700'">
+              <div
+                v-for="(item, index) in separateStore.items"
+                :key="index"
+                class="item-row p-3 rounded-xl transition-all duration-200"
+                :class="
+                  separateStore.lastScannedItem?.number === item.number
+                    ? 'bg-amber-500/20 border-2 border-amber-500'
+                    : 'bg-slate-700/50 hover:bg-slate-700'
+                "
+              >
                 <div class="flex items-center gap-3">
                   <div
-                    class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-md">
-                    <span class="text-xs font-bold text-white">{{ String(index + 1).padStart(3, '0') }}</span>
+                    class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-md"
+                  >
+                    <span class="text-xs font-bold text-white">{{
+                      String(index + 1).padStart(3, '0')
+                    }}</span>
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 mb-0.5">
                       <span
-                        class="text-xs font-semibold text-primary-400 bg-primary-500/20 px-2 py-0.5 rounded-md border border-primary-500/30">
+                        class="text-xs font-semibold text-primary-400 bg-primary-500/20 px-2 py-0.5 rounded-md border border-primary-500/30"
+                      >
                         {{ item.article }}
                       </span>
-                      <van-icon v-if="separateStore.lastScannedItem?.number === item.number" name="star" size="14"
-                        color="#fbbf24" class="mr-1" />
+                      <van-icon
+                        v-if="separateStore.lastScannedItem?.number === item.number"
+                        name="star"
+                        size="14"
+                        color="#fbbf24"
+                        class="mr-1"
+                      />
                     </div>
                     <p class="text-sm font-medium text-slate-100 truncate">{{ item.name }}</p>
                   </div>
                   <div class="flex items-center gap-3 flex-shrink-0">
                     <span class="text-xs font-mono text-slate-500">{{ item.number }}</span>
-                    <van-icon name="delete-o" size="20" color="#f87171" @click="requestRemoveItem(index)"
-                      class="cursor-pointer hover:scale-110 transition-transform" />
+                    <van-icon
+                      name="delete-o"
+                      size="20"
+                      color="#f87171"
+                      class="cursor-pointer hover:scale-110 transition-transform"
+                      @click="requestRemoveItem(index)"
+                    />
                   </div>
                 </div>
               </div>
@@ -416,13 +452,23 @@ async function confirmClear() {
 
       <!-- Кнопки действий -->
       <div class="bottom-actions flex gap-2">
-        <Button class="basis-full" variant="warning" :disabled="!separateStore.canUndo"
-          :class="!separateStore.canUndo ? 'opacity-50' : ''" @click="performUndo">
+        <Button
+          class="basis-full"
+          variant="warning"
+          :disabled="!separateStore.canUndo"
+          :class="!separateStore.canUndo ? 'opacity-50' : ''"
+          @click="performUndo"
+        >
           <van-icon name="replay" />
           Отмена
         </Button>
-        <Button class="basis-full" variant="success" :disabled="separateStore.totalItems === 0"
-          :class="separateStore.totalItems === 0 ? 'opacity-50' : ''" @click="finishSeparate">
+        <Button
+          class="basis-full"
+          variant="success"
+          :disabled="separateStore.totalItems === 0"
+          :class="separateStore.totalItems === 0 ? 'opacity-50' : ''"
+          @click="finishSeparate"
+        >
           <van-icon name="down" />
           Завершить
         </Button>
@@ -430,18 +476,39 @@ async function confirmClear() {
     </main>
 
     <!-- Модальное окно сканера -->
-    <Modal :model-value="showScanner" @update:model-value="(val) => { showScanner = val; if (!val) stopScanner() }"
-      @confirm="handleStopScanner" confirm-text="Стоп" confirm-color="danger">
+    <Modal
+      :model-value="showScanner"
+      confirm-text="Стоп"
+      confirm-color="danger"
+      @update:model-value="
+        (val) => {
+          showScanner = val
+          if (!val) stopScanner()
+        }
+      "
+      @confirm="handleStopScanner"
+    >
       <div class="text-center mb-4">
         <h3 class="font-semibold text-slate-100 mb-1">📷 Сканирование штрихкода</h3>
         <p class="text-sm text-slate-400">Наведите камеру на штрихкод</p>
       </div>
-      <div :id="scannerElementId" class="scanner-element rounded-2xl overflow-hidden mb-4"></div>
+      <div class="scanner-element rounded-2xl overflow-hidden mb-4 relative">
+        <div :id="scannerElementId" class="w-full"></div>
+        <!-- Сканирующая линия -->
+        <div class="scan-line"></div>
+        <!-- Рамка сканера -->
+        <div class="scan-frame"></div>
+      </div>
     </Modal>
 
     <!-- Модальное окно стоп-товара -->
-    <Modal v-model="showStopItemModal" title="⛔ Стоп-товар!" :show-cancel="false" confirm-text="OK"
-      @confirm="showStopItemModal = false">
+    <Modal
+      v-model="showStopItemModal"
+      title="⛔ Стоп-товар!"
+      :show-cancel="false"
+      confirm-text="OK"
+      @confirm="showStopItemModal = false"
+    >
       <div v-if="currentStopItem" class="text-left space-y-3">
         <div>
           <p class="text-xs text-slate-400 mb-1">Наименование</p>
@@ -464,8 +531,13 @@ async function confirmClear() {
     </Modal>
 
     <!-- Модальное окно дубликата -->
-    <Modal v-model="showDuplicateModal" title="⚠️ Дубликат!" :show-cancel="false" confirm-text="OK"
-      @confirm="showDuplicateModal = false">
+    <Modal
+      v-model="showDuplicateModal"
+      title="⚠️ Дубликат!"
+      :show-cancel="false"
+      confirm-text="OK"
+      @confirm="showDuplicateModal = false"
+    >
       <div v-if="currentDuplicateItem" class="text-left space-y-3">
         <div>
           <p class="text-xs text-slate-400 mb-1">Наименование</p>
@@ -482,24 +554,46 @@ async function confirmClear() {
     </Modal>
 
     <!-- Модальное окно удаления -->
-    <Modal v-model="showRemoveModal" title="Удалить товар?" show-cancel confirm-text="Удалить" cancel-text="Отмена"
-      confirm-color="danger" @confirm="confirmRemove">
+    <Modal
+      v-model="showRemoveModal"
+      title="Удалить товар?"
+      show-cancel
+      confirm-text="Удалить"
+      cancel-text="Отмена"
+      confirm-color="danger"
+      @confirm="confirmRemove"
+    >
       <p v-if="removeIndex !== null" class="text-slate-400 text-center">
-        {{ separateStore.items[removeIndex]?.name }} ({{ separateStore.items[removeIndex]?.number }})
+        {{ separateStore.items[removeIndex]?.name }} ({{
+          separateStore.items[removeIndex]?.number
+        }})
       </p>
     </Modal>
 
     <!-- Модальное окно завершения -->
-    <Modal v-model="showFinishModal" title="Завершить список?" show-cancel confirm-text="Завершить" cancel-text="Отмена"
-      @confirm="confirmFinish">
+    <Modal
+      v-model="showFinishModal"
+      title="Завершить список?"
+      show-cancel
+      confirm-text="Завершить"
+      cancel-text="Отмена"
+      @confirm="confirmFinish"
+    >
       <p class="text-slate-400 text-center">
         В списке {{ separateStore.totalItems }} товаров. Будет скачан Excel файл.
       </p>
     </Modal>
 
     <!-- Модальное окно очистки -->
-    <Modal v-model="showClearModal" title="Очистить список?" show-cancel confirm-text="Очистить" cancel-text="Отмена"
-      confirm-color="danger" @confirm="confirmClear">
+    <Modal
+      v-model="showClearModal"
+      title="Очистить список?"
+      show-cancel
+      confirm-text="Очистить"
+      cancel-text="Отмена"
+      confirm-color="danger"
+      @confirm="confirmClear"
+    >
       <p class="text-slate-400 text-center">Все товары будут удалены</p>
     </Modal>
   </div>
@@ -512,9 +606,43 @@ async function confirmClear() {
 
 /* Scanner element */
 .scanner-element {
+  position: relative;
   width: 100%;
   max-width: 320px;
   margin: 0 auto;
+  min-height: 250px;
+  background: #0f172a;
+}
+
+.scan-frame {
+  position: absolute;
+  inset: 10%;
+  border: 3px solid rgba(236, 72, 153, 0.8);
+  border-radius: 16px;
+  pointer-events: none;
+  z-index: 10;
+  box-shadow: 0 0 15px rgba(236, 72, 153, 0.3);
+}
+
+.scan-line {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #ec4899, transparent);
+  z-index: 11;
+  animation: scan 2s ease-in-out infinite;
+  box-shadow: 0 0 15px rgba(236, 72, 153, 0.6);
+}
+
+@keyframes scan {
+  0%,
+  100% {
+    top: 20%;
+  }
+  50% {
+    top: 78%;
+  }
 }
 
 /* Items list scrollbar */
