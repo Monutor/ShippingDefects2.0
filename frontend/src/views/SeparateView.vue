@@ -339,8 +339,14 @@ async function confirmClear() {
       </div>
     </main>
 
-    <!-- Inline scanner element -->
-    <div v-if="showScanner" class="inline-scanner-wrapper">
+    <!-- Модальное окно сканера -->
+    <Modal
+      :model-value="showScanner"
+      confirm-text="Стоп"
+      confirm-color="danger"
+      @update:model-value="(val) => { showScanner = val; if (!val) sc.stopScanner() }"
+      @confirm="handleStopScanner"
+    >
       <div class="text-center mb-4">
         <h3 class="font-semibold text-slate-100 mb-1">📷 Сканирование штрихкода</h3>
         <p class="text-sm text-slate-400">Наведите камеру на штрихкод</p>
@@ -350,8 +356,7 @@ async function confirmClear() {
         <div class="scan-line"></div>
         <div class="scan-frame"></div>
       </div>
-      <Button variant="danger" block @click="handleStopScanner">Стоп</Button>
-    </div>
+    </Modal>
 
     <Modal v-model="showStopItemModal" title="⛔ Стоп-товар!" :show-cancel="false" confirm-text="OK" @confirm="showStopItemModal = false">
       <div v-if="currentStopItem" class="text-left space-y-3">
@@ -393,5 +398,4 @@ async function confirmClear() {
 .items-list-detail::-webkit-scrollbar { width: 6px; }
 .items-list-detail::-webkit-scrollbar-track { background: #1e293b; border-radius: 3px; }
 .items-list-detail::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
-.inline-scanner-wrapper { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
 </style>
