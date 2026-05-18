@@ -284,24 +284,24 @@ function handleKeyDown(event) {
 
         <div class="mode-switcher mb-4">
           <div class="grid grid-cols-2 gap-3">
-            <button :class="['py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2', sc.scanMode === 'tsd' ? 'bg-gradient-to-r from-primary-500 to-primary-700 text-white shadow-lg shadow-primary-500/30' : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700']" @click="sc.scanMode = 'tsd'">
+            <button :class="['py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2', sc.scanMode.value === 'tsd' ? 'bg-gradient-to-r from-primary-500 to-primary-700 text-white shadow-lg shadow-primary-500/30' : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700']" @click="sc.scanMode.value = 'tsd'">
               <img src="/img/bank-terminal.svg" alt="ТСД" class="w-5 h-5" /> ТСД
             </button>
-            <button :class="['py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2', sc.scanMode === 'camera' ? 'bg-gradient-to-r from-purple-500 to-purple-700 text-white shadow-lg shadow-purple-500/30' : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700']" @click="sc.scanMode = 'camera'">
+            <button :class="['py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2', sc.scanMode.value === 'camera' ? 'bg-gradient-to-r from-purple-500 to-purple-700 text-white shadow-lg shadow-purple-500/30' : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700']" @click="sc.scanMode.value = 'camera'">
               <img src="/img/camera-svg.svg" alt="Камера" class="w-5 h-5" /> Камера
             </button>
           </div>
         </div>
 
-        <div v-if="sc.scanMode === 'tsd'" class="space-y-3 mt-4">
-          <Input v-model="sc.tsdInput" placeholder="📱 Введите штрихкод и нажмите Enter" :disabled="sc.isProcessingTsd" variant="primary" size="large" @keyup.enter="sc.handleTsdInput(processScannedCode)" />
+        <div v-if="sc.scanMode.value === 'tsd'" class="space-y-3 mt-4">
+          <Input v-model="sc.tsdInput.value" placeholder="📱 Введите штрихкод и нажмите Enter" :disabled="sc.isProcessingTsd.value" variant="primary" size="large" @keyup.enter="sc.handleTsdInput(processScannedCode)" />
           <p class="text-xs text-slate-400 mt-1 ml-2">💡 Введите номер товара (например 45328) — префикс добавится автоматически</p>
         </div>
 
-        <div v-if="sc.scanMode === 'camera'" class="space-y-3">
-          <Button variant="primary" block @click="sc.isScanning ? sc.stopScanner() : startScanner()">
-            <van-icon :name="sc.isScanning ? 'stop-circle-o' : 'scan'" size="20" />
-            {{ sc.isScanning ? 'Сканирование...' : 'Старт' }}
+        <div v-if="sc.scanMode.value === 'camera'" class="space-y-3">
+          <Button variant="primary" block @click="sc.isScanning.value ? sc.stopScanner() : startScanner()">
+            <van-icon :name="sc.isScanning.value ? 'stop-circle-o' : 'scan'" size="20" />
+            {{ sc.isScanning.value ? 'Сканирование...' : 'Старт' }}
           </Button>
           <p class="text-sm text-slate-500 mt-3 text-center">📷 Нажмите «Старт» для сканирования одного кода</p>
         </div>
