@@ -330,7 +330,7 @@ async function confirmClear() {
           <Button size="md" @click="handleTsdInput">Добавить</Button>
         </div>
         <p class="text-xs text-slate-500 mt-2 ml-2">
-          💡 Введите последние 5 цифр после слеша (187/xxxxx)
+          💡 Введите номер товара (например 45328) — префикс добавится автоматически
         </p>
       </div>
 
