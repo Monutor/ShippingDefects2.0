@@ -29,10 +29,9 @@ export default defineConfig({
   base: '/ShippingDefects2.0/',
   // Переименовываем файлы чтобы не было _ в начале
   build: {
-    emptyOutDir: true, // Очищать dist перед сборкой
+    emptyOutDir: true,
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
-      external: ['fsevents'],
       output: {
         entryFileNames: `assets/entry-[hash].js`,
         chunkFileNames: `assets/chunk-[hash].js`,
@@ -42,7 +41,6 @@ export default defineConfig({
           }
           return `assets/[name]-[hash].[ext]`
         },
-        // Vite 8 — manualChunks как функция
         manualChunks(id) {
           if (/node_modules/.test(id)) return 'vendor'
           return null
