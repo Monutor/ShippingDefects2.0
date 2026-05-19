@@ -15,7 +15,7 @@ defineEmits(['click-left', 'click-right'])
       <!-- Left -->
       <div class="nav-bar-left">
         <button v-if="leftArrow || leftText" class="nav-bar-button" @click="$emit('click-left')">
-          <van-icon v-if="leftArrow" name="arrow-left" size="16" />
+          <van-icon v-if="leftArrow" name="arrow-left" size="16" aria-hidden="true" />
           <span v-if="leftText" class="nav-bar-button-text">{{ leftText }}</span>
         </button>
       </div>

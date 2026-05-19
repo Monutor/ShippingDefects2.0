@@ -22,7 +22,9 @@ function getToken() {
   } catch (e) {
     try {
       localStorage.removeItem('warehouse-brain-user')
-    } catch {}
+    } catch (cleanupErr) {
+      console.error('[api] failed to clear corrupted user storage:', cleanupErr)
+    }
     return null
   }
 }
@@ -59,7 +61,9 @@ async function request(url, options = {}) {
   let data = null
   try {
     data = JSON.parse(rawText)
-  } catch {}
+  } catch {
+    // Response is not JSON — will be handled by !res.ok check below
+  }
 
   if (!res.ok) {
     // Если 401 — токен истёк или невалидный: очищаем сессию и перенаправляем на login
@@ -81,7 +85,9 @@ async function request(url, options = {}) {
           if (tokenExpired) {
             localStorage.removeItem('warehouse-brain-user')
           }
-        } catch {}
+        } catch (navErr) {
+          console.error('[api] failed to parse user session for 401 check:', navErr)
+        }
       }
 
       // Перенаправляем на login только если токен истёк
@@ -143,7 +149,9 @@ export const auth = {
   async signOut() {
     try {
       localStorage.removeItem('warehouse-brain-user')
-    } catch {}
+    } catch (err) {
+      console.error('[api] signOut: failed to clear localStorage:', err)
+    }
   },
 
   /** Check if authenticated */
@@ -417,7 +425,9 @@ function _connectWithToken(token) {
 
           const fns = _listeners.get(msg.type) || []
           for (const fn of fns) fn(msg)
-        } catch {}
+        } catch (err) {
+          console.error('[api] ws: failed to process message:', err)
+        }
       }
     }
     _socket.onerror = () => {
@@ -502,7 +512,9 @@ export const ws = {
     if (!_socket || _socket.readyState !== WebSocket.OPEN) return false
     try {
       _socket.send(JSON.stringify({ type, ...payload }))
-    } catch {}
+    } catch (err) {
+      console.error('[api] ws: send failed:', err)
+    }
     return true
   }
 }

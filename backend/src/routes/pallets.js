@@ -102,6 +102,31 @@ export default async function palletRoutes(app) {
 
     const { source_type, source_id, name, article, comment } = body;
 
+    // Проверка дубликата для box: микс не должен быть в активном паллете
+    if (source_type === 'box') {
+      const existingInActive = await query(
+        `SELECT pi.pallet_id, p.pallet_number, p.status
+         FROM pallet_items pi
+         JOIN pallets p ON pi.pallet_id = p.id
+         WHERE pi.source_type = 'box' AND pi.source_id = $1 AND p.status = 'active'`,
+        [source_id]
+      );
+      if (existingInActive && existingInActive.length > 0) {
+        const existing = existingInActive[0];
+        // Если микс уже в ТЕКУЩЕМ паллете — просто игнорируем (idempotent)
+        if (existing.pallet_id === request.params.id) {
+          return reply.send({ success: true, id: 'already_exists' });
+        }
+        const ownerName = await getOwnerName(existing.pallet_id);
+        return reply.code(409).send({
+          error: 'duplicate_in_active_pallet',
+          box_id: source_id,
+          message: `Микс уже добавлен в активный паллет #${existing.pallet_number}`,
+          pallet_number: existing.pallet_number
+        });
+      }
+    }
+
     // Валидация source_id типа против source_type
     if (source_type === 'box') {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -39,7 +39,7 @@ onUnmounted(() => {
       leave-from-class="opacity-100 scale-100"
       leave-to-class="opacity-0 scale-95"
     >
-      <div v-if="visible" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+      <div v-if="visible" role="alert" aria-live="assertive" aria-atomic="true" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
         <!-- Default -->
         <div
           v-if="type === 'default'"

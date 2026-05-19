@@ -3,7 +3,8 @@ import { ref, computed } from 'vue'
 import { db, auth } from '@/lib/api.js'
 import { logScan } from '@/utils/sync'
 import { parseBarcodeToBrainNumber } from '@/utils/barcode'
-import { isAdmin as checkIsAdmin } from '@/config'
+import { showError } from '@/utils/showError'
+import { useCanUndo, useLastScannedItem, flushOfflineQueue, clearAllWithAdminCheck } from './useContainerUtils'
 
 /**
  * Store для отдельных товаров (независимые товары, не привязанные к контейнерам).
@@ -27,15 +28,9 @@ export const useSeparateStore = defineStore('separate', () => {
   // Вычисляемое: количество отдельных товаров
   const totalItems = computed(() => items.value.length)
 
-  // Вычисляемое: есть ли действия для отмены
-  const canUndo = computed(() => actionHistory.value.length > 0)
-
-  // Вычисляемое: последний отсканированный товар (для UI)
-  const lastScannedItem = computed(() => {
-    if (actionHistory.value.length === 0) return null
-    const lastAction = actionHistory.value[actionHistory.value.length - 1]
-    return lastAction.type === 'add_item' ? lastAction.item : null
-  })
+  // Вычисляемые из shared utils
+  const canUndo = useCanUndo(actionHistory)
+  const lastScannedItem = useLastScannedItem(actionHistory)
 
   /* ============================================================
    Загрузка данных с сервера
@@ -143,7 +138,7 @@ export const useSeparateStore = defineStore('separate', () => {
       // M5 fix: rollback конкретного элемента по индексу вместо pop() — при WS обновлениях от других клиентов pop() удалит не тот элемент
       items.value.splice(pushIndex, 1)
       actionHistory.value.pop()
-      window.showToast(`⚠️ Не удалось сохранить: ${error.message}`)
+      showError(error.message, 'Не удалось сохранить товар')
     } finally {
       isSyncing.value = false
     }
@@ -251,47 +246,26 @@ export const useSeparateStore = defineStore('separate', () => {
 
   /** Очистить весь список на сервере и локально */
   async function clearAll() {
-    if (!checkIsAdmin()) {
-      window.showToast('⚠️ Только администратор может очистить все данные')
-      return false
-    }
-    if (navigator.onLine) {
-      try {
-        const result = await db.separateItems.clearAll()
-        if (result.error) throw new Error(result.error.message)
-      } catch {
-        // ignore
-      }
-    }
-    items.value = []
-    actionHistory.value = [] // L1 fix: сбрасываем историю при очистке
-    pendingOfflineDeletes.value = [] // очищаем очередь удалений тоже
-    return true
+    return clearAllWithAdminCheck(
+      () => db.separateItems.clearAll(),
+      () => {
+        items.value = []
+        actionHistory.value = []
+        pendingOfflineDeletes.value = []
+      },
+      isSyncing
+    )
   }
 
   /** Flush offline deletes queue — BUG-6 fix: отправляем накопленные офлайн удаления на сервер */
   async function flushPendingOfflineDeletes() {
-    if (!navigator.onLine || pendingOfflineDeletes.value.length === 0) return
-    const queued = [...pendingOfflineDeletes.value]
-    pendingOfflineDeletes.value = []
-
-    const TTL = 24 * 60 * 60 * 1000 // 24 часа
-    const now = Date.now()
-
-    for (const entry of queued) {
-      // BUG-216 fix: TTL для офлайн deletes — удаляем старые записи
-      if (entry.timestamp && now - entry.timestamp > TTL) {
-        continue
-      }
-      try {
+    await flushOfflineQueue(
+      pendingOfflineDeletes,
+      async (entry) => {
         await db.separateItems.deleteById(entry.item.number)
-      } catch (err) {
-        if (err?.code === '404' || err?.statusCode === 404) {
-        } else {
-          pendingOfflineDeletes.value.unshift(entry)
-        }
-      }
-    }
+      },
+      (err) => err?.code === '404' || err?.statusCode === 404
+    )
   }
 
   return {

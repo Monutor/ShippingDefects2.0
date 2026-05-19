@@ -53,7 +53,7 @@ function handleDelete() {
         class="w-full h-full flex items-center justify-center text-white"
         @click="handleDelete"
       >
-        <van-icon name="delete-o" size="20" />
+        <van-icon name="delete-o" size="20" aria-hidden="true" />
       </button>
     </div>
 

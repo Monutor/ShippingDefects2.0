@@ -21,6 +21,7 @@ const showStopItemModal = ref(false)
 const currentStopItem = ref(null)
 const showDuplicateModal = ref(false)
 const currentDuplicateItem = ref(null)
+const isLoading = ref(false)
 
 // SeparateView использует inline-сканер (не модалку) — showScanner управляет видимостью элемента
 const showScanner = ref(false)
@@ -136,7 +137,12 @@ onMounted(async () => {
   const savedMode = localStorage.getItem('separateScanMode')
   if (savedMode === 'tsd' || savedMode === 'camera') sc.scanMode.value = savedMode
 
-  await separateStore.loadSeparateItems()
+  isLoading.value = true
+  try {
+    await separateStore.loadSeparateItems()
+  } finally {
+    isLoading.value = false
+  }
 
   window.addEventListener('keydown', handleKeyDown)
 })
@@ -288,7 +294,7 @@ async function confirmClear() {
           ]"
           @click="startScanner"
         >
-          <van-icon :name="sc.isScanning.value ? 'play-circle-o' : 'scan'" size="20" />
+          <van-icon :name="sc.isScanning.value ? 'play-circle-o' : 'scan'" size="20" aria-hidden="true" />
           {{ sc.isScanning.value ? 'Сканирование...' : 'Старт' }}
         </Button>
         <p class="text-sm text-slate-500 mt-3 text-center">📷 Нажмите «Старт» для сканирования</p>
@@ -297,12 +303,12 @@ async function confirmClear() {
       <div class="items-list-section mb-4">
         <div class="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl overflow-hidden">
           <div class="p-4 border-b border-slate-700">
-            <h3 class="font-semibold text-slate-100 flex items-center gap-2"><van-icon name="bag-o" class="text-primary-400" /> Товары в списке</h3>
+            <h3 class="font-semibold text-slate-100 flex items-center gap-2"><van-icon name="bag-o" class="text-primary-400" aria-hidden="true" /> Товары в списке</h3>
           </div>
           <div class="p-4">
-            <Loader v-if="separateStore.isSyncing" text="Загрузка товаров..." />
+            <Loader v-if="isLoading || separateStore.isSyncing" :text="isLoading ? 'Загрузка товаров...' : 'Синхронизация...'" />
             <div v-else-if="separateStore.totalItems === 0" class="text-center py-8">
-              <div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-3"><van-icon name="bag-o" size="32" color="#64748b" /></div>
+              <div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-3"><van-icon name="bag-o" size="32" color="#64748b" aria-hidden="true" /></div>
               <p class="text-slate-400 text-sm">Пока нет товаров. Отсканируйте штрихкод.</p>
             </div>
             <div v-else class="items-list-detail space-y-2 max-h-96 overflow-y-auto scrollbar-thin">
@@ -314,13 +320,13 @@ async function confirmClear() {
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 mb-0.5">
                       <span class="text-xs font-semibold text-primary-400 bg-primary-500/20 px-2 py-0.5 rounded-md border border-primary-500/30">{{ item.article }}</span>
-                      <van-icon v-if="separateStore.lastScannedItem?.number === item.number" name="star" size="14" color="#fbbf24" class="mr-1" />
+                      <van-icon v-if="separateStore.lastScannedItem?.number === item.number" name="star" size="14" color="#fbbf24" class="mr-1" aria-hidden="true" />
                     </div>
                     <p class="text-sm font-medium text-slate-100 truncate">{{ item.name }}</p>
                   </div>
                   <div class="flex items-center gap-3 flex-shrink-0">
                     <span class="text-xs font-mono text-slate-500">{{ item.number }}</span>
-                    <van-icon name="delete-o" size="20" color="#f87171" class="cursor-pointer hover:scale-110 transition-transform" @click="requestRemoveItem(index)" />
+                    <van-icon name="delete-o" size="20" color="#f87171" role="button" aria-label="Удалить товар" class="cursor-pointer hover:scale-110 transition-transform" @click="requestRemoveItem(index)" />
                   </div>
                 </div>
               </div>
@@ -330,8 +336,8 @@ async function confirmClear() {
       </div>
 
       <div class="bottom-actions flex gap-2">
-        <Button class="basis-full" variant="warning" :disabled="!separateStore.canUndo" :class="!separateStore.canUndo ? 'opacity-50' : ''" @click="performUndo"><van-icon name="replay" /> Отмена</Button>
-        <Button class="basis-full" variant="success" :disabled="separateStore.totalItems === 0" :class="separateStore.totalItems === 0 ? 'opacity-50' : ''" @click="finishSeparate"><van-icon name="down" /> Завершить</Button>
+        <Button class="basis-full" variant="warning" :disabled="!separateStore.canUndo" :class="!separateStore.canUndo ? 'opacity-50' : ''" @click="performUndo"><van-icon name="replay" aria-hidden="true" /> Отмена</Button>
+        <Button class="basis-full" variant="success" :disabled="separateStore.totalItems === 0" :class="separateStore.totalItems === 0 ? 'opacity-50' : ''" @click="finishSeparate"><van-icon name="down" aria-hidden="true" /> Завершить</Button>
       </div>
     </main>
 

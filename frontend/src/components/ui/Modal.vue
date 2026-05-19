@@ -23,6 +23,7 @@ const isVisible = computed({
 
 function handleConfirm() {
   emit('confirm')
+  isVisible.value = false
 }
 
 function handleCancel() {

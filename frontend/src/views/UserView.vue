@@ -189,7 +189,7 @@ async function confirmClearAll() {
     window.showToast('Все данные очищены')
     loadStats()
   } catch (err) {
-    window.showToast('❌ Ошибка: ' + err.message)
+    window.showToast('❌ Ошибка очистки данных')
   }
 }
 
@@ -207,7 +207,7 @@ async function confirmClearBrainDatabase() {
       window.showToast('⚠️ Очистка отменена')
     }
   } catch (err) {
-    window.showToast('❌ Ошибка: ' + err.message)
+    window.showToast('❌ Ошибка очистки базы')
   }
 }
 

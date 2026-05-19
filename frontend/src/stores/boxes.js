@@ -2,9 +2,10 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { parseBarcodeToBrainNumber } from '@/utils/barcode'
 import { auth, db } from '@/lib/api.js'
-import { isAdmin } from '@/config'
 import { logScan } from '@/utils/sync'
 import { useCollectorStore } from '@/stores/collector'
+import { showError } from '@/utils/showError'
+import { useCanUndo, useLastScannedItem, flushOfflineQueue, clearAllWithAdminCheck } from './useContainerUtils'
 
 /**
  * Store для управления коробами с товарами (server-first).
@@ -32,41 +33,18 @@ export const useBoxesStore = defineStore(
 
     /** Flush offline box items queue — BUG-4 fix: отправляем накопленные офлайн товары при восстановлении сети */
     async function flushPendingOfflineBoxItems() {
-      if (!navigator.onLine || pendingOfflineBoxItems.value.length === 0) return
-
-      // TTL: очищаем офлайн записи старше 24 часов чтобы не накапливались бесконечно
-      const MAX_OFFLINE_AGE_MS = 24 * 60 * 60 * 1000 // 24 часа
-      const now = Date.now()
-      pendingOfflineBoxItems.value = pendingOfflineBoxItems.value.filter((entry) => {
-        if (entry.timestamp && now - entry.timestamp > MAX_OFFLINE_AGE_MS) {
-          return false
-        }
-        return true
-      })
-
-      if (pendingOfflineBoxItems.value.length === 0) return
-
-      const queued = [...pendingOfflineBoxItems.value]
-      pendingOfflineBoxItems.value = []
-
-      for (const entry of queued) {
-        try {
-          // Нужно: добавить товар в короб на сервере. Используем существующий API через db.boxItems.add
+      await flushOfflineQueue(
+        pendingOfflineBoxItems,
+        async (entry) => {
           await db.boxItems.addItem(entry.boxId, {
             barcode: entry.item.number,
             name: entry.item.name,
             brand: entry.item.article || '',
             comment: entry.item.comment || ''
           })
-        } catch (err) {
-          // P1 fix: при дубликате НЕ возвращаем в очередь — товар реально уже в коробе. Без этого бесконечный цикл retry.
-          if (err?.code === '23505' || /duplicate/i.test(err?.message)) {
-            // НЕ возвращаем в очередь — товар реально дубликат
-          } else if (pendingOfflineBoxItems.value.length > 0) {
-            pendingOfflineBoxItems.value.unshift(entry)
-          }
-        }
-      }
+        },
+        (err) => err?.code === '23505' || /duplicate/i.test(err?.message)
+      )
     }
 
     // Вычисляемое: количество собранных коробов
@@ -77,15 +55,9 @@ export const useBoxesStore = defineStore(
       return currentBox.value && currentBox.value.items ? currentBox.value.items.length : 0
     })
 
-    // Вычисляемое: есть ли действия для отмены
-    const canUndo = computed(() => actionHistory.value.length > 0)
-
-    // Вычисляемое: последний отсканированный товар (для UI)
-    const lastScannedItem = computed(() => {
-      if (actionHistory.value.length === 0) return null
-      const lastAction = actionHistory.value[actionHistory.value.length - 1]
-      return lastAction.type === 'add_item' ? lastAction.item : null
-    })
+    // Вычисляемые из shared utils
+    const canUndo = useCanUndo(actionHistory)
+    const lastScannedItem = useLastScannedItem(actionHistory)
 
     // Вычисляемое: товары текущего короба в обратном порядке (новые сверху)
     const currentBoxItemsReverse = computed(() => {
@@ -422,7 +394,7 @@ export const useBoxesStore = defineStore(
               return { success: false, error: 'duplicate_server', boxNumber }
             }
             syncError.value = `Не синхронизировано: ${result.error.message}`
-            window.showToast(`⚠️ Не удалось сохранить товар: ${result.error.message}`)
+            showError(result.error.message, 'Не удалось сохранить товар')
             return { success: false }
           }
         } catch (error) {
@@ -430,7 +402,7 @@ export const useBoxesStore = defineStore(
           currentBox.value.items.pop()
           actionHistory.value.pop()
           syncError.value = `Не синхронизировано: ${error.message}`
-          window.showToast(`⚠️ Не удалось сохранить товар: ${error.message}`)
+          showError(error.message, 'Не удалось сохранить товар')
         }
       } else if (currentBox.value.backendId && !navigator.onLine) {
         // BUG-4 fix: офлайн — добавляем в очередь, flush при восстановлении сети
@@ -564,7 +536,7 @@ export const useBoxesStore = defineStore(
 
         // Обработка 403 — чужой контейнер
         if (error.message?.includes('создан')) {
-          window.showToast(error.message, 4000, 'error')
+          showError(error.message, 'Ошибка завершения короба')
         } else {
           currentBox.value = originalCurrentBox
         }
@@ -692,31 +664,14 @@ export const useBoxesStore = defineStore(
 
     /** Очистка всех finished коробов */
     async function clearAllBoxes() {
-      if (!isAdmin()) {
-        window.showToast('⚠️ Очищать общую базу может только администратор')
-        return { success: false, error: 'Только админ' }
-      }
-
-      isSyncing.value = true
-
-      try {
-        const result = await db.boxes.clearAllFinished({ active: true })
-
-        if (result.error) {
-          window.showToast(`❌ Ошибка очистки серверной базы: ${result.error.message}`)
-          return { success: false, error: result.error.message }
-        }
-
-        // Очищаем локально
-        boxes.value = []
-        currentBox.value = null
-        return { success: true }
-      } catch (error) {
-        window.showToast(`❌ Ошибка: ${error.message}`)
-        return { success: false, error: error.message }
-      } finally {
-        isSyncing.value = false
-      }
+      return clearAllWithAdminCheck(
+        () => db.boxes.clearAllFinished({ active: true }),
+        () => {
+          boxes.value = []
+          currentBox.value = null
+        },
+        isSyncing
+      )
     }
 
     /** Очистка при получении события с сервера — только finished (не active!) */

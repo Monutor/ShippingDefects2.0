@@ -136,7 +136,7 @@ watch(
       <div
         class="w-16 h-16 rounded-full bg-red-500/20 border border-red-500/30 flex items-center justify-center mb-4"
       >
-        <van-icon name="warning-o" size="32" color="#ef4444" />
+        <van-icon name="warning-o" size="32" color="#ef4444" aria-hidden="true" />
       </div>
       <p class="text-red-400 text-lg font-medium text-center">{{ error }}</p>
     </div>
@@ -234,7 +234,7 @@ watch(
             <div
               class="w-16 h-16 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mx-auto mb-3"
             >
-              <van-icon name="bag-o" size="32" color="#475569" />
+              <van-icon name="bag-o" size="32" color="#475569" aria-hidden="true" />
             </div>
             <p class="text-slate-500 text-sm">Короб пуст</p>
           </div>

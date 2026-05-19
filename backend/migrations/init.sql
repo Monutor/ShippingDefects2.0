@@ -184,9 +184,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_pallet_items_unique_pallet
     ON pallet_items(pallet_id, source_id)
     WHERE source_type = 'pallet';
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_active_pallet_items_unique
-    ON pallet_items(source_id)
-    WHERE source_type = 'pallet';
+-- idx_active_pallet_items_unique удалён — он запрещал добавлять микс в новый паллет,
+-- если тот уже был в завершённом паллете. Достаточно idx_pallet_items_unique_pallet
+-- (запрещает дубли в рамках одного паллета) + backend-проверки для активных паллетов.
+
+-- idx_active_pallet_items_unique удалён — он запрещал добавлять микс в новый паллет,
+-- если тот уже был в завершённом паллете. Достаточно idx_pallet_items_unique_pallet
+-- (запрещает дубли в рамках одного паллета) + backend-проверки для активных паллетов.
+
+-- idx_active_pallet_items_unique удалён — он запрещал добавлять микс в новый паллет,
+-- если тот уже был в завершённом паллете. Достаточно idx_pallet_items_unique_pallet
+-- (запрещает дубли в рамках одного паллета) + backend-проверки для активных паллетов.
+
+-- idx_active_pallet_items_unique удалён — он запрещал добавлять микс в новый паллет,
+-- если тот уже был в завершённом паллете. Достаточно idx_pallet_items_unique_pallet
+-- (запрещает дубли в рамках одного паллета) + backend-проверки для активных паллетов.
+
+-- Удалён idx_active_pallet_items_unique — он запрещал добавлять микс в новый паллет,
+-- если тот уже был в завершённом паллете. Достаточно idx_pallet_items_unique_pallet.
 
 -- ============================================================
 -- 017: Box number sequence

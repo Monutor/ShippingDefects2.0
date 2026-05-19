@@ -13,7 +13,11 @@ defineProps({
   disabled: Boolean,
   loading: Boolean,
   block: Boolean,
-  icon: String
+  icon: String,
+  ariaLabel: {
+    type: String,
+    default: ''
+  }
 })
 
 defineEmits(['click'])
@@ -36,6 +40,7 @@ const sizeClasses = {
 
 <template>
   <button
+    :aria-label="ariaLabel || undefined"
     :class="[
       'relative inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200',
       'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-slate-900',

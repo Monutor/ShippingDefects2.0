@@ -57,7 +57,7 @@ async function handleFileSelect(file) {
     }, 500)
   } catch (err) {
     error.value = err.message
-    window.showToast('Ошибка: ' + err.message)
+    window.showToast('Ошибка загрузки файла')
   } finally {
     isLoading.value = false
   }
@@ -127,7 +127,7 @@ function autoMapColumns(headers) {
 
       <!-- Ошибка -->
       <div v-if="error" class="error-message">
-        <van-icon name="warning-o" size="24" color="#f87171" />
+        <van-icon name="warning-o" size="24" color="#f87171" aria-hidden="true" />
         <p>{{ error }}</p>
       </div>
     </div>

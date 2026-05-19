@@ -68,13 +68,17 @@ class ScanBatchManager {
           this.timer = setTimeout(() => this.flush(), SCAN_BATCH_INTERVAL)
         }
       }
-    } catch {}
+    } catch (err) {
+      console.error('[sync] loadBatch: failed to restore queue from localStorage:', err)
+    }
   }
 
   saveBatch() {
     try {
       localStorage.setItem(SCAN_BATCH_QUEUE_KEY, JSON.stringify(this.batch))
-    } catch {}
+    } catch (err) {
+      console.error('[sync] saveBatch: failed to persist queue:', err)
+    }
   }
 
   add(scanData) {
@@ -204,7 +208,7 @@ export function logScan(scanData) {
     })
   } catch (err) {
     if (typeof window.showToast === 'function') {
-      window.showToast(`⚠️ Ошибка сохранения скана: ${err.message}`)
+      window.showToast('Ошибка сохранения скана')
     }
   }
 }

@@ -79,7 +79,9 @@ window.addEventListener('online', async () => {
     if (separateStore.flushPendingOfflineDeletes) {
       await separateStore.flushPendingOfflineDeletes()
     }
-  } catch {}
+  } catch (err) {
+    console.error('[app] failed to flush offline separate deletes queue:', err)
+  }
 })
 
 // ============================================
@@ -150,7 +152,9 @@ try {
   const { useCollectorStore } = await import('@/stores/collector')
   const collectorStore = useCollectorStore()
   collectorStore.restoreFromAuthSession()
-} catch {}
+} catch (err) {
+  console.error('[app] failed to restore collector profile from auth session:', err)
+}
 
 // GitHub Pages SPA redirect handling
 const redirectPath = sessionStorage.getItem('redirect_path')
