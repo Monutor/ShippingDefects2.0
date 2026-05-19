@@ -223,7 +223,7 @@ export const useSeparateStore = defineStore('separate', () => {
         })
 
         try {
-          const result = await db.separateItems.deleteById(itemToRemove.id || itemToRemove.number)
+          const result = await db.separateItems.deleteById(itemToRemove.number)
           if (result.error) throw new Error(result.error.message)
         } catch (err) {
           // Rollback: возвращаем товар на место и восстанавливаем actionHistory
@@ -284,7 +284,7 @@ export const useSeparateStore = defineStore('separate', () => {
         continue
       }
       try {
-        await db.separateItems.deleteById(entry.item.id || entry.item.number)
+        await db.separateItems.deleteById(entry.item.number)
       } catch (err) {
         if (err?.code === '404' || err?.statusCode === 404) {
         } else {

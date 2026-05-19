@@ -127,11 +127,7 @@ function handleStopScanner() {
 watch(sc.scanMode, (newMode, oldMode) => {
   if (newMode === oldMode) return
   localStorage.setItem('separateScanMode', newMode)
-  if (newMode === 'camera') {
-    nextTick(() => startScanner())
-  } else {
-    stopScanner()
-  }
+  stopScanner()
   window.showToast(`Режим: ${newMode === 'tsd' ? 'ТСД' : 'Камера'}`)
 })
 

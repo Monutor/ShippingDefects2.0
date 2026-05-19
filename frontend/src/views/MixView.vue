@@ -205,7 +205,8 @@ const isContainerOwner = computed(() => {
 
 const sc = useScanner({
   elementId: 'barcode-scanner',
-  onScanSuccess: processScannedCode
+  onScanSuccess: processScannedCode,
+  onScanComplete: () => { showScanner.value = false }
 })
 
 onMounted(async () => {

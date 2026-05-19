@@ -18,7 +18,8 @@ import { createScanner, checkCameraSupport } from '@/utils/scanner'
 export function useScanner(options = {}) {
   const {
     elementId = 'barcode-scanner',
-    onScanSuccess
+    onScanSuccess,
+    onScanComplete
   } = options
 
   const isScanning = ref(false)
@@ -53,6 +54,7 @@ export function useScanner(options = {}) {
         if (!barcode) return
         if (onScanSuccess) await onScanSuccess(barcode)
         stopScanner()
+        if (onScanComplete) onScanComplete()
       },
       {}
     )
