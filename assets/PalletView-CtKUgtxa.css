@@ -1,0 +1,1 @@
+.item-new-glow[data-v-53605e01]{position:relative}.item-new-glow[data-v-53605e01]:after{content:"NEW";z-index:10;color:#fff;background:#10b981;border-radius:4px;padding:2px 6px;font-size:10px;font-weight:600;line-height:1.4;animation:1.5s ease-in-out infinite badgePulse-53605e01;position:absolute;top:4px;right:12px}@keyframes badgePulse-53605e01{0%,to{opacity:1}50%{opacity:.7}}

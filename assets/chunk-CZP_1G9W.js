@@ -1,0 +1,2 @@
+function e(e,t=`Произошла ошибка. Попробуйте снова.`){if(!e){window.showToast(t);return}let n=String(e);if(/syntax error|relation|column|table|constraint|violat/i.test(n)){window.showToast(t);return}if(n.includes(`
+`)||n.includes(`at `)){window.showToast(t);return}if(/ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN/i.test(n)){window.showToast(`Нет соединения с сервером`);return}if(/fetch|network|request failed/i.test(n)){window.showToast(`Ошибка сети. Проверьте подключение.`);return}window.showToast(`⚠️ ${n}`)}export{e as t};
