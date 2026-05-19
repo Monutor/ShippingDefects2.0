@@ -7,7 +7,10 @@
  *   VITE_BACKEND_URL=https://your-domain.com      (prod)
  */
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
+const API_BASE =
+  import.meta.env.DEV
+    ? ''
+    : (import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001')
 
 /** Получить JWT-токен из localStorage */
 function getToken() {
@@ -40,10 +43,15 @@ function authHeaders() {
 async function request(url, options = {}) {
   const fullUrl = `${API_BASE}${url}`
 
+  const headers = { ...authHeaders() }
+  if (!options.body) {
+    delete headers['Content-Type']
+  }
+
   const res = await fetch(fullUrl, {
     ...options,
     signal: options.signal,
-    headers: { ...authHeaders(), ...(options.headers || {}) }
+    headers: { ...headers, ...(options.headers || {}) }
   })
 
   // Читаем body один раз — затем пробуем распарсить как JSON
@@ -238,8 +246,8 @@ export const db = {
       if (options.containerType) body.containerType = options.containerType
       return request('/api/separate', { method: 'POST', body: JSON.stringify(body) })
     },
-    async deleteById(itemId) {
-      return request(`/api/separate?barcode=${encodeURIComponent(itemId)}`, { method: 'DELETE' })
+    async deleteById(barcode) {
+      return request(`/api/separate?barcode=${encodeURIComponent(barcode)}`, { method: 'DELETE' })
     },
     async clearAll() {
       return request('/api/separate', { method: 'DELETE' })
@@ -351,6 +359,10 @@ export const maintenance = {
 
 // WS URL выводится из VITE_BACKEND_URL — единый источник truth для API и WS
 function buildWsUrl() {
+  if (import.meta.env.DEV) {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${proto}//${location.host}/ws/sync`
+  }
   const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
   try {
     const url = new URL(backendUrl)
