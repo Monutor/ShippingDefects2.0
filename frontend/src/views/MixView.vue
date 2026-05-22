@@ -155,7 +155,10 @@ async function confirmFinish() {
     window.showToast(`✅ Микс ${finishedBox.name} завершён. Пломба: ${finishedBox.seal}`)
     try {
       const { exportBoxToExcel } = await import('@/utils/excel')
-      const collector = { fullName: collectorStore.fullName || '', position: collectorStore.position || '' }
+      const collector = {
+        fullName: collectorStore.fullName || '',
+        position: collectorStore.position || ''
+      }
       const result = await exportBoxToExcel(finishedBox, collector)
       if (result.success) window.showToast(`Файл скачан: ${result.filename}`)
     } catch (err) {
@@ -170,7 +173,9 @@ async function confirmFinish() {
   }
 }
 
-function cancelBox() { boxesStore.cancelCurrentBox() }
+function cancelBox() {
+  boxesStore.cancelCurrentBox()
+}
 
 async function performUndo() {
   const undoneItem = await boxesStore.undoLastAction()
@@ -206,7 +211,9 @@ const isContainerOwner = computed(() => {
 const sc = useScanner({
   elementId: 'barcode-scanner',
   onScanSuccess: processScannedCode,
-  onScanComplete: () => { showScanner.value = false }
+  onScanComplete: () => {
+    showScanner.value = false
+  }
 })
 
 onMounted(async () => {
@@ -244,22 +251,24 @@ function handleKeyDown(event) {
 
 <template>
   <ContainerView
+    v-model:show-scanner="showScanner"
     :store="boxesStore"
+    v-model:show-stop-item-modal="showStopItemModal"
     container-type="box"
+    v-model:show-remove-modal="showRemoveModal"
     container-label="микс"
+    v-model:show-finish-modal="showFinishModal"
     container-label-plural="миксы"
     nav-title="Миксы"
     :is-loading="isLoading"
     :right-text="activeBoxes.length > 0 ? 'Смотреть' : 'Результаты'"
-    :right-route="activeBoxes.length > 0 ? { path: '/mix', query: { id: activeBoxes[0].id } } : '/boxes'"
+    :right-route="
+      activeBoxes.length > 0 ? { path: '/mix', query: { id: activeBoxes[0].id } } : '/boxes'
+    "
     :active-containers="activeBoxes"
     :items="boxesStore.currentBoxItemsReverse"
-    v-model:show-scanner="showScanner"
-    v-model:show-stop-item-modal="showStopItemModal"
     :current-stop-item="currentStopItem"
-    v-model:show-remove-modal="showRemoveModal"
     :remove-item-ref="removeItemRef"
-    v-model:show-finish-modal="showFinishModal"
     :scanner="sc"
     :is-owner="isContainerOwner"
     :show-mixes-section="false"
@@ -267,7 +276,11 @@ function handleKeyDown(event) {
     finish-modal-description="Вы уверены что хотите завершить микс?"
     :get-item-highlight="mixItemHighlight"
     @click-left="$router.back()"
-    @click-right="activeBoxes.length > 0 ? $router.push({ path: '/mix', query: { id: activeBoxes[0].id } }) : $router.push('/boxes')"
+    @click-right="
+      activeBoxes.length > 0
+        ? $router.push({ path: '/mix', query: { id: activeBoxes[0].id } })
+        : $router.push('/boxes')
+    "
     @create-container="createAndSelectNewBox"
     @select-container="selectBox"
     @start-scanner="startScanner"
@@ -281,5 +294,4 @@ function handleKeyDown(event) {
   />
 </template>
 
-<style scoped>
-</style>
+<style scoped></style>

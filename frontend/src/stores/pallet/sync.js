@@ -7,14 +7,8 @@ import { showError } from '@/utils/showError'
  * Composable для синхронизации, undo и проверки дубликатов.
  */
 export function usePalletSync(context) {
-  const {
-    pallets,
-    currentPallet,
-    actionHistory,
-    isSyncing,
-    syncError,
-    triggerPalletItemsUpdate
-  } = context
+  const { pallets, currentPallet, actionHistory, isSyncing, syncError, triggerPalletItemsUpdate } =
+    context
 
   async function checkGlobalDuplicate(scannedBarcode) {
     const parsedNumber = parseBarcodeToBrainNumber(scannedBarcode)

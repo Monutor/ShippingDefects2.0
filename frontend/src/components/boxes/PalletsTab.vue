@@ -65,7 +65,9 @@ function formatDate(dateString) {
           </div>
         </div>
         <Button block class="mt-3 custom-btn-primary" @click="router.push('/pallet-view')">
-          <van-icon name="add-o" class="mr-2" aria-hidden="true" /> Создать паллет ({{ availableBoxes.length }}
+          <van-icon name="add-o" class="mr-2" aria-hidden="true" /> Создать паллет ({{
+            availableBoxes.length
+          }}
           коробов доступно)
         </Button>
       </div>
@@ -78,14 +80,9 @@ function formatDate(dateString) {
 
     <div v-else class="boxes-list py-4">
       <SwipeCard v-for="pallet in palletsReverse" :key="pallet.id">
-        <div
-          class="box-card p-4 cursor-pointer"
-          @click="router.push(`/pallet/${pallet.id}`)"
-        >
+        <div class="box-card p-4 cursor-pointer" @click="router.push(`/pallet/${pallet.id}`)">
           <div class="flex items-center justify-between mb-2">
-            <p class="text-xs text-slate-500 mb-1">
-              👤 {{ pallet.collector_id || 'Неизвестный' }}
-            </p>
+            <p class="text-xs text-slate-500 mb-1">👤 {{ pallet.collector_id || 'Неизвестный' }}</p>
             <span
               v-if="!isOwner(pallet.collector_id)"
               class="px-2 py-0.5 bg-red-500/20 border border-red-500/30 rounded-full text-xs font-semibold text-red-400"
@@ -120,7 +117,9 @@ function formatDate(dateString) {
         </div>
       </SwipeCard>
       <Button block class="mt-4 custom-btn-primary" @click="$emit('export-all')">
-        <van-icon name="down" class="mr-2" aria-hidden="true" /> Экспортировать все паллеты ({{ pallets.length }})
+        <van-icon name="down" class="mr-2" aria-hidden="true" /> Экспортировать все паллеты ({{
+          pallets.length
+        }})
       </Button>
     </div>
   </div>

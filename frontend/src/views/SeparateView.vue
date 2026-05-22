@@ -212,7 +212,9 @@ async function confirmClear() {
 </script>
 
 <template>
-  <div class="separate-view min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 pb-20">
+  <div
+    class="separate-view min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 pb-20"
+  >
     <NavBar
       title="Отдельные товары"
       left-text="Назад"
@@ -271,12 +273,20 @@ async function confirmClear() {
       </div>
 
       <div class="info-card mb-4">
-        <div class="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-3 text-white shadow-lg shadow-emerald-500/20 border border-emerald-500/30">
+        <div
+          class="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-3 text-white shadow-lg shadow-emerald-500/20 border border-emerald-500/30"
+        >
           <div class="flex items-center gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center text-2xl flex-shrink-0">🚚</div>
+            <div
+              class="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center text-2xl flex-shrink-0"
+            >
+              🚚
+            </div>
             <div class="flex-1">
               <h3 class="font-semibold text-lg mb-1">Отдельные товары</h3>
-              <p class="text-sm text-white/80">Товаров: <span class="font-bold text-white">{{ separateStore.totalItems }}</span></p>
+              <p class="text-sm text-white/80">
+                Товаров: <span class="font-bold text-white">{{ separateStore.totalItems }}</span>
+              </p>
             </div>
             <Badge variant="success" class="px-2 py-2 text-center text-xs">1 товар = 1 место</Badge>
           </div>
@@ -294,39 +304,85 @@ async function confirmClear() {
           ]"
           @click="startScanner"
         >
-          <van-icon :name="sc.isScanning.value ? 'play-circle-o' : 'scan'" size="20" aria-hidden="true" />
+          <van-icon
+            :name="sc.isScanning.value ? 'play-circle-o' : 'scan'"
+            size="20"
+            aria-hidden="true"
+          />
           {{ sc.isScanning.value ? 'Сканирование...' : 'Старт' }}
         </Button>
         <p class="text-sm text-slate-500 mt-3 text-center">📷 Нажмите «Старт» для сканирования</p>
       </div>
 
       <div class="items-list-section mb-4">
-        <div class="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl overflow-hidden">
+        <div
+          class="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl overflow-hidden"
+        >
           <div class="p-4 border-b border-slate-700">
-            <h3 class="font-semibold text-slate-100 flex items-center gap-2"><van-icon name="bag-o" class="text-primary-400" aria-hidden="true" /> Товары в списке</h3>
+            <h3 class="font-semibold text-slate-100 flex items-center gap-2">
+              <van-icon name="bag-o" class="text-primary-400" aria-hidden="true" /> Товары в списке
+            </h3>
           </div>
           <div class="p-4">
-            <Loader v-if="isLoading || separateStore.isSyncing" :text="isLoading ? 'Загрузка товаров...' : 'Синхронизация...'" />
+            <Loader
+              v-if="isLoading || separateStore.isSyncing"
+              :text="isLoading ? 'Загрузка товаров...' : 'Синхронизация...'"
+            />
             <div v-else-if="separateStore.totalItems === 0" class="text-center py-8">
-              <div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-3"><van-icon name="bag-o" size="32" color="#64748b" aria-hidden="true" /></div>
+              <div
+                class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-3"
+              >
+                <van-icon name="bag-o" size="32" color="#64748b" aria-hidden="true" />
+              </div>
               <p class="text-slate-400 text-sm">Пока нет товаров. Отсканируйте штрихкод.</p>
             </div>
             <div v-else class="items-list-detail space-y-2 max-h-96 overflow-y-auto scrollbar-thin">
-              <div v-for="(item, index) in separateStore.items" :key="index" class="item-row p-3 rounded-xl transition-all duration-200" :class="separateStore.lastScannedItem?.number === item.number ? 'bg-amber-500/20 border-2 border-amber-500' : 'bg-slate-700/50 hover:bg-slate-700'">
+              <div
+                v-for="(item, index) in separateStore.items"
+                :key="index"
+                class="item-row p-3 rounded-xl transition-all duration-200"
+                :class="
+                  separateStore.lastScannedItem?.number === item.number
+                    ? 'bg-amber-500/20 border-2 border-amber-500'
+                    : 'bg-slate-700/50 hover:bg-slate-700'
+                "
+              >
                 <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-md">
-                    <span class="text-xs font-bold text-white">{{ String(index + 1).padStart(3, '0') }}</span>
+                  <div
+                    class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-md"
+                  >
+                    <span class="text-xs font-bold text-white">{{
+                      String(index + 1).padStart(3, '0')
+                    }}</span>
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 mb-0.5">
-                      <span class="text-xs font-semibold text-primary-400 bg-primary-500/20 px-2 py-0.5 rounded-md border border-primary-500/30">{{ item.article }}</span>
-                      <van-icon v-if="separateStore.lastScannedItem?.number === item.number" name="star" size="14" color="#fbbf24" class="mr-1" aria-hidden="true" />
+                      <span
+                        class="text-xs font-semibold text-primary-400 bg-primary-500/20 px-2 py-0.5 rounded-md border border-primary-500/30"
+                        >{{ item.article }}</span
+                      >
+                      <van-icon
+                        v-if="separateStore.lastScannedItem?.number === item.number"
+                        name="star"
+                        size="14"
+                        color="#fbbf24"
+                        class="mr-1"
+                        aria-hidden="true"
+                      />
                     </div>
                     <p class="text-sm font-medium text-slate-100 truncate">{{ item.name }}</p>
                   </div>
                   <div class="flex items-center gap-3 flex-shrink-0">
                     <span class="text-xs font-mono text-slate-500">{{ item.number }}</span>
-                    <van-icon name="delete-o" size="20" color="#f87171" role="button" aria-label="Удалить товар" class="cursor-pointer hover:scale-110 transition-transform" @click="requestRemoveItem(index)" />
+                    <van-icon
+                      name="delete-o"
+                      size="20"
+                      color="#f87171"
+                      role="button"
+                      aria-label="Удалить товар"
+                      class="cursor-pointer hover:scale-110 transition-transform"
+                      @click="requestRemoveItem(index)"
+                    />
                   </div>
                 </div>
               </div>
@@ -336,8 +392,22 @@ async function confirmClear() {
       </div>
 
       <div class="bottom-actions flex gap-2">
-        <Button class="basis-full" variant="warning" :disabled="!separateStore.canUndo" :class="!separateStore.canUndo ? 'opacity-50' : ''" @click="performUndo"><van-icon name="replay" aria-hidden="true" /> Отмена</Button>
-        <Button class="basis-full" variant="success" :disabled="separateStore.totalItems === 0" :class="separateStore.totalItems === 0 ? 'opacity-50' : ''" @click="finishSeparate"><van-icon name="down" aria-hidden="true" /> Завершить</Button>
+        <Button
+          class="basis-full"
+          variant="warning"
+          :disabled="!separateStore.canUndo"
+          :class="!separateStore.canUndo ? 'opacity-50' : ''"
+          @click="performUndo"
+          ><van-icon name="replay" aria-hidden="true" /> Отмена</Button
+        >
+        <Button
+          class="basis-full"
+          variant="success"
+          :disabled="separateStore.totalItems === 0"
+          :class="separateStore.totalItems === 0 ? 'opacity-50' : ''"
+          @click="finishSeparate"
+          ><van-icon name="down" aria-hidden="true" /> Завершить</Button
+        >
       </div>
     </main>
 
@@ -346,7 +416,12 @@ async function confirmClear() {
       :model-value="showScanner"
       confirm-text="Стоп"
       confirm-color="danger"
-      @update:model-value="(val) => { showScanner = val; if (!val) sc.stopScanner() }"
+      @update:model-value="
+        (val) => {
+          showScanner = val
+          if (!val) sc.stopScanner()
+        }
+      "
       @confirm="handleStopScanner"
     >
       <div class="text-center mb-4">
@@ -360,44 +435,148 @@ async function confirmClear() {
       </div>
     </Modal>
 
-    <Modal v-model="showStopItemModal" title="⛔ Стоп-товар!" :show-cancel="false" confirm-text="OK" @confirm="showStopItemModal = false">
+    <Modal
+      v-model="showStopItemModal"
+      title="⛔ Стоп-товар!"
+      :show-cancel="false"
+      confirm-text="OK"
+      @confirm="showStopItemModal = false"
+    >
       <div v-if="currentStopItem" class="text-left space-y-3">
-        <div><p class="text-xs text-slate-400 mb-1">Наименование</p><p class="text-slate-100 font-medium">{{ currentStopItem.name }}</p></div>
-        <div><p class="text-xs text-slate-400 mb-1">Номер</p><p class="text-slate-100 font-mono">{{ currentStopItem.number }}</p></div>
-        <div><p class="text-xs text-slate-400 mb-1">Комментарий</p><p class="text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">{{ currentStopItem.comment || 'Нет комментария' }}</p></div>
-        <p class="text-xs text-slate-500 mt-2">Этот товар нельзя отгружать в брак. Обратитесь к руководству для уточнения.</p>
+        <div>
+          <p class="text-xs text-slate-400 mb-1">Наименование</p>
+          <p class="text-slate-100 font-medium">{{ currentStopItem.name }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-400 mb-1">Номер</p>
+          <p class="text-slate-100 font-mono">{{ currentStopItem.number }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-400 mb-1">Комментарий</p>
+          <p class="text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+            {{ currentStopItem.comment || 'Нет комментария' }}
+          </p>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">
+          Этот товар нельзя отгружать в брак. Обратитесь к руководству для уточнения.
+        </p>
       </div>
     </Modal>
 
-    <Modal v-model="showDuplicateModal" title="⚠️ Дубликат!" :show-cancel="false" confirm-text="OK" @confirm="showDuplicateModal = false">
+    <Modal
+      v-model="showDuplicateModal"
+      title="⚠️ Дубликат!"
+      :show-cancel="false"
+      confirm-text="OK"
+      @confirm="showDuplicateModal = false"
+    >
       <div v-if="currentDuplicateItem" class="text-left space-y-3">
-        <div><p class="text-xs text-slate-400 mb-1">Наименование</p><p class="text-slate-100 font-medium">{{ currentDuplicateItem.name }}</p></div>
-        <div><p class="text-xs text-slate-400 mb-1">Номер</p><p class="text-slate-100 font-mono">{{ currentDuplicateItem.number }}</p></div>
-        <p class="text-xs text-slate-500 mt-2">Этот товар уже был добавлен в список. Повторное добавление невозможно.</p>
+        <div>
+          <p class="text-xs text-slate-400 mb-1">Наименование</p>
+          <p class="text-slate-100 font-medium">{{ currentDuplicateItem.name }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-400 mb-1">Номер</p>
+          <p class="text-slate-100 font-mono">{{ currentDuplicateItem.number }}</p>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">
+          Этот товар уже был добавлен в список. Повторное добавление невозможно.
+        </p>
       </div>
     </Modal>
 
-    <Modal v-model="showRemoveModal" title="Удалить товар?" show-cancel confirm-text="Удалить" cancel-text="Отмена" confirm-color="danger" @confirm="confirmRemove">
-      <p v-if="removeIndex !== null" class="text-slate-400 text-center">{{ separateStore.items[removeIndex]?.name }} ({{ separateStore.items[removeIndex]?.number }})</p>
+    <Modal
+      v-model="showRemoveModal"
+      title="Удалить товар?"
+      show-cancel
+      confirm-text="Удалить"
+      cancel-text="Отмена"
+      confirm-color="danger"
+      @confirm="confirmRemove"
+    >
+      <p v-if="removeIndex !== null" class="text-slate-400 text-center">
+        {{ separateStore.items[removeIndex]?.name }} ({{
+          separateStore.items[removeIndex]?.number
+        }})
+      </p>
     </Modal>
 
-    <Modal v-model="showFinishModal" title="Завершить список?" show-cancel confirm-text="Завершить" cancel-text="Отмена" @confirm="confirmFinish">
-      <p class="text-slate-400 text-center">В списке {{ separateStore.totalItems }} товаров. Будет скачан Excel файл.</p>
+    <Modal
+      v-model="showFinishModal"
+      title="Завершить список?"
+      show-cancel
+      confirm-text="Завершить"
+      cancel-text="Отмена"
+      @confirm="confirmFinish"
+    >
+      <p class="text-slate-400 text-center">
+        В списке {{ separateStore.totalItems }} товаров. Будет скачан Excel файл.
+      </p>
     </Modal>
 
-    <Modal v-model="showClearModal" title="Очистить список?" show-cancel confirm-text="Очистить" cancel-text="Отмена" confirm-color="danger" @confirm="confirmClear">
+    <Modal
+      v-model="showClearModal"
+      title="Очистить список?"
+      show-cancel
+      confirm-text="Очистить"
+      cancel-text="Отмена"
+      confirm-color="danger"
+      @confirm="confirmClear"
+    >
       <p class="text-slate-400 text-center">Все товары будут удалены</p>
     </Modal>
   </div>
 </template>
 
 <style scoped>
-.separate-view { padding-bottom: 140px; }
-.scanner-element { position: relative; width: 100%; max-width: 320px; margin: 0 auto; min-height: 250px; background: #0f172a; }
-.scan-frame { position: absolute; inset: 10%; border: 3px solid rgba(236, 72, 153, 0.8); border-radius: 16px; pointer-events: none; z-index: 10; box-shadow: 0 0 15px rgba(236, 72, 153, 0.3); }
-.scan-line { position: absolute; left: 10%; right: 10%; height: 3px; background: linear-gradient(90deg, transparent, #ec4899, transparent); z-index: 11; animation: scan 2s ease-in-out infinite; box-shadow: 0 0 15px rgba(236, 72, 153, 0.6); }
-@keyframes scan { 0%, 100% { top: 20%; } 50% { top: 78%; } }
-.items-list-detail::-webkit-scrollbar { width: 6px; }
-.items-list-detail::-webkit-scrollbar-track { background: #1e293b; border-radius: 3px; }
-.items-list-detail::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+.separate-view {
+  padding-bottom: 140px;
+}
+.scanner-element {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  min-height: 250px;
+  background: #0f172a;
+}
+.scan-frame {
+  position: absolute;
+  inset: 10%;
+  border: 3px solid rgba(236, 72, 153, 0.8);
+  border-radius: 16px;
+  pointer-events: none;
+  z-index: 10;
+  box-shadow: 0 0 15px rgba(236, 72, 153, 0.3);
+}
+.scan-line {
+  position: absolute;
+  left: 10%;
+  right: 10%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #ec4899, transparent);
+  z-index: 11;
+  animation: scan 2s ease-in-out infinite;
+  box-shadow: 0 0 15px rgba(236, 72, 153, 0.6);
+}
+@keyframes scan {
+  0%,
+  100% {
+    top: 20%;
+  }
+  50% {
+    top: 78%;
+  }
+}
+.items-list-detail::-webkit-scrollbar {
+  width: 6px;
+}
+.items-list-detail::-webkit-scrollbar-track {
+  background: #1e293b;
+  border-radius: 3px;
+}
+.items-list-detail::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
 </style>

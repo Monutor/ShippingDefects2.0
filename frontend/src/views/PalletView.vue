@@ -88,7 +88,12 @@ const palletItemsWithDetails = computed(() => {
       if (!data) {
         const found = palletStore.availableSeparateItems.find((i) => i.id === ref.source_id)
         if (found) {
-          data = { number: found.barcode, name: found.name, article: found.brand || '', comment: found.comment || '' }
+          data = {
+            number: found.barcode,
+            name: found.name,
+            article: found.brand || '',
+            comment: found.comment || ''
+          }
         }
       }
       if (!data) data = { number: String(ref.source_id), name: 'Товар', article: '' }
@@ -97,13 +102,23 @@ const palletItemsWithDetails = computed(() => {
       const box = palletStore.availableBoxes.find((b) => b.id === ref.source_id)
       if (box) {
         result.push({
-          number: `Микс #${box.number}`, name: `${box.name} (${box.itemCount || 0} товаров)`,
-          article: '', comment: 'Готовый микс', isBoxRef: true, source_id: ref.source_id, source_type: 'box'
+          number: `Микс #${box.number}`,
+          name: `${box.name} (${box.itemCount || 0} товаров)`,
+          article: '',
+          comment: 'Готовый микс',
+          isBoxRef: true,
+          source_id: ref.source_id,
+          source_type: 'box'
         })
       } else if (ref._boxNumber || ref._boxName) {
         result.push({
-          number: `Микс #${ref._boxNumber || ref.source_id}`, name: `${ref._boxName || 'Микс'} (${ref._boxItemCount || 0} товаров)`,
-          article: '', comment: 'Готовый микс', isBoxRef: true, source_id: ref.source_id, source_type: 'box'
+          number: `Микс #${ref._boxNumber || ref.source_id}`,
+          name: `${ref._boxName || 'Микс'} (${ref._boxItemCount || 0} товаров)`,
+          article: '',
+          comment: 'Готовый микс',
+          isBoxRef: true,
+          source_id: ref.source_id,
+          source_type: 'box'
         })
       }
     }
@@ -112,7 +127,8 @@ const palletItemsWithDetails = computed(() => {
 })
 
 function palletItemHighlight(item, index) {
-  if (index === 0) return 'bg-emerald-500/15 border-2 border-emerald-400 item-new-glow overflow-visible'
+  if (index === 0)
+    return 'bg-emerald-500/15 border-2 border-emerald-400 item-new-glow overflow-visible'
   return 'bg-slate-700/80 hover:bg-slate-600'
 }
 
@@ -144,19 +160,30 @@ async function loadAvailableMixes() {
         }
       }
       availableMixes.value = await Promise.all(
-        boxes.filter((b) => !usedBoxIds.has(b.id)).map(async (box) => {
-          let itemCount = 0
-          try {
-            const itemsResult = await db.boxItems.getByBoxId(box.id)
-            itemCount = (itemsResult?.data || []).length
-          } catch (err) {
-            console.error('[PalletView] failed to load box items for box', box.id, err)
-          }
-          return { id: box.id, number: box.box_number || 0, name: box.name || `Микс ${box.box_number}`, itemCount, createdAt: box.created_at }
-        })
+        boxes
+          .filter((b) => !usedBoxIds.has(b.id))
+          .map(async (box) => {
+            let itemCount = 0
+            try {
+              const itemsResult = await db.boxItems.getByBoxId(box.id)
+              itemCount = (itemsResult?.data || []).length
+            } catch (err) {
+              console.error('[PalletView] failed to load box items for box', box.id, err)
+            }
+            return {
+              id: box.id,
+              number: box.box_number || 0,
+              name: box.name || `Микс ${box.box_number}`,
+              itemCount,
+              createdAt: box.created_at
+            }
+          })
       )
     }
-  } catch (err) {} finally { isLoadingMixes.value = false }
+  } catch (err) {
+  } finally {
+    isLoadingMixes.value = false
+  }
 }
 
 async function addMixToPallet(box) {
@@ -234,7 +261,13 @@ async function processScannedCode(barcode) {
 
   const scannedAt = new Date().toISOString()
   const itemData = item
-    ? { number: normalizedBarcode, name: item.name, article: item.article, comment: item.comment, scannedAt }
+    ? {
+        number: normalizedBarcode,
+        name: item.name,
+        article: item.article,
+        comment: item.comment,
+        scannedAt
+      }
     : { number: normalizedBarcode, name: `Товар ${normalizedBarcode}`, scannedAt }
   const result = await palletStore.addInlineItemToPallet(itemData)
   if (result?.success) {
@@ -275,7 +308,10 @@ async function confirmFinish() {
     window.showToast(`✅ Паллет ${finishedPallet.name} завершён. Пломба: ${finishedPallet.seal}`)
     try {
       const { exportPalletToExcel } = await import('@/utils/excel')
-      const result = await exportPalletToExcel(finishedPallet, { fullName: collectorStore.fullName || '', position: collectorStore.position || '' })
+      const result = await exportPalletToExcel(finishedPallet, {
+        fullName: collectorStore.fullName || '',
+        position: collectorStore.position || ''
+      })
       if (result.success) window.showToast(`Файл скачан: ${result.filename}`)
     } catch (err) {
       console.error('[PalletView] exportPalletToExcel failed:', err)
@@ -321,10 +357,13 @@ async function refreshPalletItems() {
             const boxItemsResult = await db.boxItems.getByBoxId(boxRef.source_id)
             const boxItemsList = boxItemsResult?.data || []
             serverItems.push({
-              source_type: 'box', source_id: boxRef.source_id, order_num: boxResult.data.box_number || 0,
+              source_type: 'box',
+              source_id: boxRef.source_id,
+              order_num: boxResult.data.box_number || 0,
               _full_data: boxItemsList.length > 0 ? { items: boxItemsList } : null,
               _undoId: crypto.randomUUID ? crypto.randomUUID() : `undo-${Date.now()}`,
-              _boxNumber: boxResult.data.box_number || 0, _boxName: boxResult.data.name || `Микс ${boxResult.data.box_number}`,
+              _boxNumber: boxResult.data.box_number || 0,
+              _boxName: boxResult.data.name || `Микс ${boxResult.data.box_number}`,
               _boxItemCount: boxItemsList.length
             })
           }
@@ -332,13 +371,20 @@ async function refreshPalletItems() {
           console.error('[PalletView] failed to load box items for enrichment:', err)
         }
       }
-      serverItems.push(...otherRefs.map((i) => ({
-        source_type: i.source_type === 'pallet' || i.source_type === 'inline' ? 'pallet' : i.source_type,
-        source_id: i.source_id, barcode: i.item_barcode || '',
-        name: i.item_name && i.item_name.trim() ? i.item_name : `Товар ${i.source_id}`,
-        article: i.item_brand && i.item_brand.trim() ? i.item_brand : '',
-        comment: i.item_comment && i.item_comment.trim() ? i.item_comment : '', scannedAt: i.scanned_at || ''
-      })).filter(Boolean))
+      serverItems.push(
+        ...otherRefs
+          .map((i) => ({
+            source_type:
+              i.source_type === 'pallet' || i.source_type === 'inline' ? 'pallet' : i.source_type,
+            source_id: i.source_id,
+            barcode: i.item_barcode || '',
+            name: i.item_name && i.item_name.trim() ? i.item_name : `Товар ${i.source_id}`,
+            article: i.item_brand && i.item_brand.trim() ? i.item_brand : '',
+            comment: i.item_comment && i.item_comment.trim() ? i.item_comment : '',
+            scannedAt: i.scanned_at || ''
+          }))
+          .filter(Boolean)
+      )
       palletStore.currentPallet = { ...palletStore.currentPallet, items: serverItems }
       palletStore.triggerPalletItemsUpdate()
       window.showToast('Обновлено', 1500)
@@ -372,7 +418,9 @@ const isContainerOwner = computed(() => {
 const sc = useScanner({
   elementId: 'barcode-scanner',
   onScanSuccess: processScannedCode,
-  onScanComplete: () => { showScanner.value = false }
+  onScanComplete: () => {
+    showScanner.value = false
+  }
 })
 
 onMounted(async () => {
@@ -398,7 +446,9 @@ onMounted(async () => {
       allPalletsGlobal = result.data
       const { useCollectorStore } = await import('@/stores/collector')
       const collectorStore = useCollectorStore()
-      activePallets.value = (result.data || []).filter((p) => p.status === 'active' && p.collector_id === collectorStore.employeeId)
+      activePallets.value = (result.data || []).filter(
+        (p) => p.status === 'active' && p.collector_id === collectorStore.employeeId
+      )
     }
   }
   window.addEventListener('keydown', handleKeyDown)
@@ -421,9 +471,13 @@ function handleKeyDown(event) {
 
 <template>
   <ContainerView
+    v-model:show-scanner="showScanner"
     :store="palletStore"
+    v-model:show-stop-item-modal="showStopItemModal"
     container-type="pallet"
+    v-model:show-remove-modal="showRemoveModal"
     container-label="паллет"
+    v-model:show-finish-modal="showFinishModal"
     container-label-plural="паллеты"
     nav-title="Паллеты"
     :is-loading="isLoading"
@@ -431,12 +485,8 @@ function handleKeyDown(event) {
     :right-route="{ path: '/pallet', query: { id: activePallets[0]?.id } }"
     :active-containers="activePallets"
     :items="palletItemsWithDetails"
-    v-model:show-scanner="showScanner"
-    v-model:show-stop-item-modal="showStopItemModal"
     :current-stop-item="currentStopItem"
-    v-model:show-remove-modal="showRemoveModal"
     :remove-item-ref="removeItemRef"
-    v-model:show-finish-modal="showFinishModal"
     :scanner="sc"
     :is-owner="isContainerOwner"
     :show-mixes-section="true"
@@ -446,7 +496,11 @@ function handleKeyDown(event) {
     finish-modal-description="Вы уверены что хотите завершить паллет?"
     :get-item-highlight="palletItemHighlight"
     @click-left="$router.back()"
-    @click-right="activePallets.length > 0 ? $router.push({ path: '/pallet', query: { id: activePallets[0].id } }) : $router.push('/boxes')"
+    @click-right="
+      activePallets.length > 0
+        ? $router.push({ path: '/pallet', query: { id: activePallets[0].id } })
+        : $router.push('/boxes')
+    "
     @create-container="createAndSelectNewPallet"
     @select-container="selectPallet"
     @start-scanner="startScanner"
@@ -464,7 +518,9 @@ function handleKeyDown(event) {
 </template>
 
 <style scoped>
-.item-new-glow { position: relative; }
+.item-new-glow {
+  position: relative;
+}
 .item-new-glow::after {
   content: 'NEW';
   position: absolute;
@@ -480,5 +536,13 @@ function handleKeyDown(event) {
   border-radius: 4px;
   line-height: 1.4;
 }
-@keyframes badgePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+@keyframes badgePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
 </style>

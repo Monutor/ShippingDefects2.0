@@ -4,7 +4,12 @@ import { db, auth } from '@/lib/api.js'
 import { logScan } from '@/utils/sync'
 import { parseBarcodeToBrainNumber } from '@/utils/barcode'
 import { showError } from '@/utils/showError'
-import { useCanUndo, useLastScannedItem, flushOfflineQueue, clearAllWithAdminCheck } from './useContainerUtils'
+import {
+  useCanUndo,
+  useLastScannedItem,
+  flushOfflineQueue,
+  clearAllWithAdminCheck
+} from './useContainerUtils'
 
 /**
  * Store для отдельных товаров (независимые товары, не привязанные к контейнерам).

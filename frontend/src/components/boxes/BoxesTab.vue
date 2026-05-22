@@ -37,9 +37,7 @@ function formatDate(dateString) {
         <span class="text-5xl">📦</span>
       </div>
       <h3 class="text-lg font-semibold text-slate-100 mb-2">Пока нет миксов</h3>
-      <p class="text-slate-400 text-sm mb-6">
-        Начните сканирование для создания первого короба
-      </p>
+      <p class="text-slate-400 text-sm mb-6">Начните сканирование для создания первого короба</p>
       <Button @click="$router.push('/mix-view')">Начать сканирование</Button>
     </div>
 
@@ -73,7 +71,9 @@ function formatDate(dateString) {
         </div>
       </SwipeCard>
       <Button block class="mt-4 custom-btn-primary" @click="$emit('export-all')">
-        <van-icon name="down" class="mr-2" aria-hidden="true" /> Экспортировать все короба ({{ boxes.length }})
+        <van-icon name="down" class="mr-2" aria-hidden="true" /> Экспортировать все короба ({{
+          boxes.length
+        }})
       </Button>
     </div>
   </div>

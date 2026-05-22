@@ -5,12 +5,7 @@ import { db } from '@/lib/api.js'
  * Принимает контекст store и возвращает функции загрузки.
  */
 export function usePalletLoading(context) {
-  const {
-    pallets,
-    currentPallet,
-    availableBoxes,
-    availableSeparateItems
-  } = context
+  const { pallets, currentPallet, availableBoxes, availableSeparateItems } = context
 
   async function loadPallets() {
     try {

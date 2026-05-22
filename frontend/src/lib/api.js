@@ -7,10 +7,9 @@
  *   VITE_BACKEND_URL=https://your-domain.com      (prod)
  */
 
-const API_BASE =
-  import.meta.env.DEV
-    ? ''
-    : (import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001')
+const API_BASE = import.meta.env.DEV
+  ? ''
+  : import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'
 
 /** Получить JWT-токен из localStorage */
 function getToken() {

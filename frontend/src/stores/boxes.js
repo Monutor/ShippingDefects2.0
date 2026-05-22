@@ -5,7 +5,12 @@ import { auth, db } from '@/lib/api.js'
 import { logScan } from '@/utils/sync'
 import { useCollectorStore } from '@/stores/collector'
 import { showError } from '@/utils/showError'
-import { useCanUndo, useLastScannedItem, flushOfflineQueue, clearAllWithAdminCheck } from './useContainerUtils'
+import {
+  useCanUndo,
+  useLastScannedItem,
+  flushOfflineQueue,
+  clearAllWithAdminCheck
+} from './useContainerUtils'
 
 /**
  * Store для управления коробами с товарами (server-first).

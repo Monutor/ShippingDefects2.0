@@ -75,7 +75,12 @@ export function usePalletCrud(context) {
           return { success: false, error: 'duplicate', message: 'Этот микс уже в паллете' }
         }
         if (err?.error === 'duplicate_in_active_pallet') {
-          return { success: false, error: 'duplicate_in_active_pallet', message: err.message, pallet_number: err.pallet_number }
+          return {
+            success: false,
+            error: 'duplicate_in_active_pallet',
+            message: err.message,
+            pallet_number: err.pallet_number
+          }
         }
         showError(err.message, 'Не удалось сохранить товар в паллет')
         return false

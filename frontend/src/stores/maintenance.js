@@ -85,11 +85,11 @@ export const useMaintenanceStore = defineStore('maintenance', () => {
       })
 
       eventSource.onerror = () => {}
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.error('[maintenance] loadFromBackend failed:', err)
-        }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        console.error('[maintenance] loadFromBackend failed:', err)
       }
+    }
   }
 
   /** Отписка от realtime */
