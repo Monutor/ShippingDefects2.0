@@ -16,11 +16,7 @@ import { createScanner, checkCameraSupport } from '@/utils/scanner'
  *  - Бизнес-логикой обработки штрихкода
  */
 export function useScanner(options = {}) {
-  const {
-    elementId = 'barcode-scanner',
-    onScanSuccess,
-    onScanComplete
-  } = options
+  const { elementId = 'barcode-scanner', onScanSuccess, onScanComplete } = options
 
   const isScanning = ref(false)
   let scanner = null
@@ -48,16 +44,13 @@ export function useScanner(options = {}) {
     isScanning.value = true
     scanner = createScanner({ elementId })
 
-    scanner.start(
-      async (decodedText) => {
-        const barcode = decodedText?.trim()
-        if (!barcode) return
-        if (onScanSuccess) await onScanSuccess(barcode)
-        stopScanner()
-        if (onScanComplete) onScanComplete()
-      },
-      {}
-    )
+    scanner.start(async (decodedText) => {
+      const barcode = decodedText?.trim()
+      if (!barcode) return
+      if (onScanSuccess) await onScanSuccess(barcode)
+      stopScanner()
+      if (onScanComplete) onScanComplete()
+    }, {})
   }
 
   function stopScanner() {
@@ -92,7 +85,8 @@ export function useScanner(options = {}) {
       return
     }
 
-    if (processBarcode) await processBarcode(barcode)
+    const cb = processBarcode || options.onScanSuccess
+    if (cb) await cb(barcode)
 
     tsdInput.value = ''
     nextTick(() => {
