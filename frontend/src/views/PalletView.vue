@@ -472,12 +472,12 @@ function handleKeyDown(event) {
 <template>
   <ContainerView
     v-model:show-scanner="showScanner"
-    :store="palletStore"
     v-model:show-stop-item-modal="showStopItemModal"
-    container-type="pallet"
     v-model:show-remove-modal="showRemoveModal"
-    container-label="паллет"
     v-model:show-finish-modal="showFinishModal"
+    :store="palletStore"
+    container-type="pallet"
+    container-label="паллет"
     container-label-plural="паллеты"
     nav-title="Паллеты"
     :is-loading="isLoading"

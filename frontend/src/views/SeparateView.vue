@@ -130,6 +130,7 @@ watch(sc.scanMode, (newMode, oldMode) => {
   localStorage.setItem('separateScanMode', newMode)
   stopScanner()
   window.showToast(`Режим: ${newMode === 'tsd' ? 'ТСД' : 'Камера'}`)
+  if (newMode === 'camera') sc.fetchCameras()
 })
 
 onMounted(async () => {
@@ -294,6 +295,25 @@ async function confirmClear() {
       </div>
 
       <div v-if="sc.scanMode.value === 'camera'" class="scan-section mb-4">
+        <div v-if="sc.cameras.value.length > 1 && !sc.isScanning.value" class="mb-3 space-y-2">
+          <p class="text-xs text-slate-400">📷 Камера:</p>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="(cam, idx) in sc.cameras.value"
+              :key="cam.deviceId"
+              type="button"
+              :class="[
+                'px-3 py-2 rounded-lg text-sm border transition-colors cursor-pointer',
+                cam.deviceId === sc.selectedCameraId.value
+                  ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+              ]"
+              @click="sc.selectedCameraId.value = cam.deviceId"
+            >
+              {{ cam.label || `Камера ${idx + 1}` }}
+            </button>
+          </div>
+        </div>
         <Button
           :loading="sc.isScanning.value"
           :class="[
@@ -433,7 +453,6 @@ async function confirmClear() {
         <div class="scan-line"></div>
         <div class="scan-frame"></div>
         <button
-          v-if="sc.torchSupported.value"
           class="torch-btn"
           :class="{ active: sc.flashlight.value }"
           type="button"

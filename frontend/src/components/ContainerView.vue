@@ -46,6 +46,7 @@ const emit = defineEmits([
   'load-mixes',
   'add-mix',
   'refresh-items',
+  'update:showScanner',
   'update:showRemoveModal',
   'update:showStopItemModal',
   'update:showFinishModal'
@@ -72,8 +73,16 @@ const modalDescription = computed(() => {
   return props.finishModalDescription || `Вы уверены что хотите завершить ${props.containerLabel}?`
 })
 
+function containerIconUrl() {
+  const name = props.containerType === 'pallet' ? 'pallet-icon' : 'box-svg'
+  return `${import.meta.env.BASE_URL}img/navIcons/${name}.svg`
+}
+
 function handleScanModeChange(mode) {
   props.scanner.scanMode.value = mode
+  if (mode === 'camera') {
+    props.scanner.fetchCameras()
+  }
 }
 
 function handleScannerToggle() {
@@ -116,11 +125,10 @@ function handleScannerModalUpdate(val) {
       >
         <div class="flex items-center justify-center gap-3 mb-2">
           <img
-            :src="`${import.meta.env.BASE_URL}img/navIcons/${containerType === 'pallet' ? 'pallet-icon' : 'box-svg'}.svg`"
+            :src="containerIconUrl()"
             class="w-6 h-6 opacity-80"
             :alt="containerLabel"
           />
-          <Badge :count="containerItemCount" variant="info" />
           <span class="text-slate-100 font-medium">{{
             currentContainer?.name || `${containerLabel} не выбран`
           }}</span>
@@ -187,7 +195,7 @@ function handleScannerModalUpdate(val) {
             <div class="flex items-center justify-between">
               <span class="text-sm font-medium text-slate-100 flex items-center gap-2">
                 <img
-                  :src="`${import.meta.env.BASE_URL}img/navIcons/${containerType === 'pallet' ? 'pallet-icon' : 'box-svg'}.svg`"
+                  :src="containerIconUrl()"
                   class="w-5 h-5 opacity-60"
                   :alt="containerLabel"
                 />
@@ -247,6 +255,25 @@ function handleScannerModalUpdate(val) {
         </div>
 
         <div v-if="scanner.scanMode.value === 'camera'" class="space-y-3">
+          <div v-if="scanner.cameras.value.length > 1 && !scanner.isScanning.value" class="space-y-2">
+            <p class="text-xs text-slate-400">📷 Камера:</p>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="(cam, idx) in scanner.cameras.value"
+                :key="cam.deviceId"
+                type="button"
+                :class="[
+                  'px-3 py-2 rounded-lg text-sm border transition-colors cursor-pointer',
+                  cam.deviceId === scanner.selectedCameraId.value
+                    ? 'bg-primary-500/20 border-primary-500/30 text-primary-400'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                ]"
+                @click="scanner.selectedCameraId.value = cam.deviceId"
+              >
+                {{ cam.label || `Камера ${idx + 1}` }}
+              </button>
+            </div>
+          </div>
           <Button variant="primary" block @click="handleScannerToggle">
             <van-icon
               :name="scanner.isScanning.value ? 'stop-circle-o' : 'scan'"
@@ -459,7 +486,6 @@ function handleScannerModalUpdate(val) {
         <div class="scan-line"></div>
         <div class="scan-frame"></div>
         <button
-          v-if="scanner.torchSupported.value"
           class="torch-btn"
           :class="{ active: scanner.flashlight.value }"
           type="button"

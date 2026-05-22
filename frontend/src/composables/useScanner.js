@@ -1,5 +1,5 @@
 import { ref, nextTick } from 'vue'
-import { createScanner, checkCameraSupport } from '@/utils/scanner'
+import { createScanner, checkCameraSupport, getAvailableCameras } from '@/utils/scanner'
 
 /**
  * Композабл для управления сканером штрихкодов.
@@ -23,6 +23,20 @@ export function useScanner(options = {}) {
 
   const flashlight = ref(false)
   const torchSupported = ref(false)
+
+  const cameras = ref([])
+  const selectedCameraId = ref(null)
+
+  async function fetchCameras() {
+    const list = await getAvailableCameras()
+    cameras.value = list
+    if (list.length > 0 && !selectedCameraId.value) {
+      const back = list.find((d) =>
+        /back|environment|rear/i.test(d.label)
+      )
+      selectedCameraId.value = back ? back.deviceId : list[0].deviceId
+    }
+  }
 
   const scanMode = ref('tsd')
   const tsdInput = ref('')
@@ -48,14 +62,24 @@ export function useScanner(options = {}) {
     scanner = createScanner({ elementId })
 
     try {
+      let lastBarcode = ''
       await scanner.start(async (decodedText) => {
         const barcode = decodedText?.trim()
-        if (!barcode) return
+        if (!barcode || barcode === lastBarcode) return
+        lastBarcode = barcode
+
+        const upper = barcode.toUpperCase()
+        if (upper.startsWith('Z') && upper.length < 13) {
+          if (navigator.vibrate) navigator.vibrate(100)
+          window.showToast('Штрихкод повреждён, повторите')
+          return
+        }
+
         turnOffFlashlight()
         if (onScanSuccess) await onScanSuccess(barcode)
         stopScanner()
         if (onScanComplete) onScanComplete()
-      }, {})
+      }, { deviceId: selectedCameraId.value })
       torchSupported.value = !!scanner._torchSupported
     } catch (err) {
       window.showToast(err.message || 'Ошибка запуска камеры')
@@ -130,6 +154,9 @@ export function useScanner(options = {}) {
     handleTsdInput,
     flashlight,
     torchSupported,
-    toggleFlashlight
+    toggleFlashlight,
+    cameras,
+    selectedCameraId,
+    fetchCameras
   }
 }

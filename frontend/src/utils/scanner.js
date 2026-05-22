@@ -34,9 +34,8 @@ export class BarcodeScanner {
     }
 
     const defaultConfig = {
-      fps: 25,
-      qrbox: { width: 300, height: 300 },
-      aspectRatio: 1.0,
+      fps: 15,
+      qrbox: { width: 400, height: 250 },
       disableFlip: false,
       showTorchButtonIfSupported: true,
       formats: [
@@ -61,13 +60,15 @@ export class BarcodeScanner {
         throw new Error('Сканер не инициализирован — вызовите init() перед start()')
       }
 
-      // Запускаем сканирование с использованием задней камеры
+      // Запускаем сканирование — указанная камера или задняя по умолчанию
+      const cameraConfig = config.deviceId
+        ? { deviceId: { exact: config.deviceId } }
+        : { facingMode: 'environment' }
+
       await this.scanner.start(
-        { facingMode: 'environment' },
+        cameraConfig,
         mergedConfig,
         (decodedText, decodedResult) => {
-          // Останавливаем сканирование после успешного чтения
-          this.stop()
           onScanSuccess(decodedText, decodedResult)
         },
         (errorMessage) => {}
@@ -204,5 +205,18 @@ export async function checkCameraSupport() {
     return true
   } catch {
     return false
+  }
+}
+
+/**
+ * Получение списка доступных видеокамер
+ * @returns {Promise<MediaDeviceInfo[]>}
+ */
+export async function getAvailableCameras() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices()
+    return devices.filter((d) => d.kind === 'videoinput')
+  } catch {
+    return []
   }
 }
