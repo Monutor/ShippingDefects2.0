@@ -115,6 +115,11 @@ function handleScannerModalUpdate(val) {
         class="status-bar bg-slate-800/80 border border-slate-700 rounded-2xl p-4 text-center"
       >
         <div class="flex items-center justify-center gap-3 mb-2">
+          <img
+            :src="`${import.meta.env.BASE_URL}img/navIcons/${containerType === 'pallet' ? 'pallet-icon' : 'box-svg'}.svg`"
+            class="w-6 h-6 opacity-80"
+            :alt="containerLabel"
+          />
           <Badge :count="containerItemCount" variant="info" />
           <span class="text-slate-100 font-medium">{{
             currentContainer?.name || `${containerLabel} не выбран`
@@ -180,9 +185,14 @@ function handleScannerModalUpdate(val) {
             @click="$emit('select-container', container)"
           >
             <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-slate-100">{{
-                container.name || containerLabel
-              }}</span>
+              <span class="text-sm font-medium text-slate-100 flex items-center gap-2">
+                <img
+                  :src="`${import.meta.env.BASE_URL}img/navIcons/${containerType === 'pallet' ? 'pallet-icon' : 'box-svg'}.svg`"
+                  class="w-5 h-5 opacity-60"
+                  :alt="containerLabel"
+                />
+                {{ container.name || containerLabel }}
+              </span>
               <span class="text-xs text-slate-400">Собиратель: {{ container.collector_id }}</span>
             </div>
           </div>
