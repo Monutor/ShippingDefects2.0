@@ -428,10 +428,30 @@ async function confirmClear() {
         <h3 class="font-semibold text-slate-100 mb-1">📷 Сканирование штрихкода</h3>
         <p class="text-sm text-slate-400">Наведите камеру на штрихкод</p>
       </div>
-      <div class="scanner-element rounded-2xl overflow-hidden mb-4 relative">
+      <div class="scanner-element rounded-2xl mb-4 relative">
         <div :id="sc.scannerElementId" class="w-full"></div>
         <div class="scan-line"></div>
         <div class="scan-frame"></div>
+        <button
+          v-if="sc.torchSupported.value"
+          class="torch-btn"
+          :class="{ active: sc.flashlight.value }"
+          type="button"
+          @click="sc.toggleFlashlight()"
+        >
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+          </svg>
+        </button>
       </div>
     </Modal>
 
@@ -556,8 +576,37 @@ async function confirmClear() {
   height: 3px;
   background: linear-gradient(90deg, transparent, #ec4899, transparent);
   z-index: 11;
+  pointer-events: none;
   animation: scan 2s ease-in-out infinite;
   box-shadow: 0 0 15px rgba(236, 72, 153, 0.6);
+}
+.torch-btn {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 20;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.torch-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.torch-btn.active {
+  background: rgba(234, 179, 8, 0.3);
+  border-color: #eab308;
+  color: #eab308;
+  box-shadow: 0 0 16px rgba(234, 179, 8, 0.4);
 }
 @keyframes scan {
   0%,

@@ -21,6 +21,9 @@ export function useScanner(options = {}) {
   const isScanning = ref(false)
   let scanner = null
 
+  const flashlight = ref(false)
+  const torchSupported = ref(false)
+
   const scanMode = ref('tsd')
   const tsdInput = ref('')
   const isProcessingTsd = ref(false)
@@ -44,9 +47,17 @@ export function useScanner(options = {}) {
     isScanning.value = true
     scanner = createScanner({ elementId })
 
+    try {
+      const capabilities = await scanner.getCameraCapabilities?.()
+      torchSupported.value = !!capabilities?.torch
+    } catch {
+      torchSupported.value = false
+    }
+
     scanner.start(async (decodedText) => {
       const barcode = decodedText?.trim()
       if (!barcode) return
+      turnOffFlashlight()
       if (onScanSuccess) await onScanSuccess(barcode)
       stopScanner()
       if (onScanComplete) onScanComplete()
@@ -57,7 +68,21 @@ export function useScanner(options = {}) {
     if (scanner) {
       scanner.stop()
       isScanning.value = false
+      flashlight.value = false
     }
+  }
+
+  function turnOffFlashlight() {
+    if (flashlight.value && scanner) {
+      scanner.toggleTorch()
+      flashlight.value = false
+    }
+  }
+
+  async function toggleFlashlight() {
+    if (!scanner || !isScanning.value) return
+    const result = await scanner.toggleTorch()
+    flashlight.value = !!result
   }
 
   function cleanupScanner() {
@@ -103,6 +128,9 @@ export function useScanner(options = {}) {
     scanMode,
     tsdInput,
     isProcessingTsd,
-    handleTsdInput
+    handleTsdInput,
+    flashlight,
+    torchSupported,
+    toggleFlashlight
   }
 }

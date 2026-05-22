@@ -7,6 +7,7 @@ export class BarcodeScanner {
   constructor() {
     this.scanner = null
     this.isScanning = false
+    this.torchOn = false
   }
 
   /**
@@ -98,6 +99,37 @@ export class BarcodeScanner {
       this.isScanning = false
     } catch (error) {
       this.isScanning = false
+    }
+  }
+
+  /**
+   * Получение возможностей камеры (capabilities)
+   * @returns {Promise<Object|null>}
+   */
+  async getCameraCapabilities() {
+    if (!this.scanner || !this.isScanning) return null
+    try {
+      return this.scanner.getRunningTrackCapabilities()
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Переключение фонарика (torch)
+   * @returns {Promise<boolean>} — новое состояние (true = включён)
+   */
+  async toggleTorch() {
+    if (!this.scanner || !this.isScanning) return false
+    try {
+      const capabilities = await this.getCameraCapabilities()
+      if (!capabilities?.torch) return false
+      this.torchOn = !this.torchOn
+      await this.scanner.applyVideoConstraints({ advanced: [{ torch: this.torchOn }] })
+      return this.torchOn
+    } catch {
+      this.torchOn = false
+      return false
     }
   }
 
