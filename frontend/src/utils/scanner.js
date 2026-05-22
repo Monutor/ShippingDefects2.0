@@ -73,6 +73,13 @@ export class BarcodeScanner {
         (errorMessage) => {}
       )
       this.isScanning = true
+
+      try {
+        const caps = this.scanner.getRunningTrackCapabilities()
+        this._torchSupported = !!caps.torch
+      } catch {
+        this._torchSupported = false
+      }
     } catch (error) {
       // Пробуем альтернативный способ - по deviceId
       if (error.message?.includes('Permission') || error.message?.includes('NotAllowed')) {

@@ -48,20 +48,19 @@ export function useScanner(options = {}) {
     scanner = createScanner({ elementId })
 
     try {
-      const capabilities = await scanner.getCameraCapabilities?.()
-      torchSupported.value = !!capabilities?.torch
-    } catch {
-      torchSupported.value = false
+      await scanner.start(async (decodedText) => {
+        const barcode = decodedText?.trim()
+        if (!barcode) return
+        turnOffFlashlight()
+        if (onScanSuccess) await onScanSuccess(barcode)
+        stopScanner()
+        if (onScanComplete) onScanComplete()
+      }, {})
+      torchSupported.value = !!scanner._torchSupported
+    } catch (err) {
+      window.showToast(err.message || 'Ошибка запуска камеры')
+      isScanning.value = false
     }
-
-    scanner.start(async (decodedText) => {
-      const barcode = decodedText?.trim()
-      if (!barcode) return
-      turnOffFlashlight()
-      if (onScanSuccess) await onScanSuccess(barcode)
-      stopScanner()
-      if (onScanComplete) onScanComplete()
-    }, {})
   }
 
   function stopScanner() {
