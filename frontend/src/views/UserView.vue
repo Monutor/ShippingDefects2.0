@@ -8,6 +8,7 @@ import { usePalletStore } from '@/stores/pallet'
 import { useBrainStore } from '@/stores/brain'
 import { auth, db } from '@/lib/api.js'
 import { isAdmin } from '@/config'
+import { version } from '../../package.json'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Modal from '@/components/ui/Modal.vue'
@@ -227,7 +228,10 @@ const initials = computed(() => {
 
 <template>
   <div class="user-page">
-    <h1 class="page-title">Профиль</h1>
+    <h1 class="page-title">
+      Профиль
+      <span class="version-badge">v{{ version }}</span>
+    </h1>
 
     <!-- Если не авторизован -->
     <div v-if="!isAuthenticated" class="not-authenticated-card">
@@ -587,6 +591,9 @@ const initials = computed(() => {
           </div>
         </div>
       </div>
+
+      <!-- Версия приложения -->
+      <div class="app-version">Warehouse Brain PWA v{{ version }}</div>
     </template>
 
     <!-- Модальное окно редактирования -->
@@ -687,6 +694,20 @@ const initials = computed(() => {
   font-weight: 700;
   color: #f1f5f9;
   margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.version-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #06d6a0;
+  background: rgba(6, 214, 160, 0.12);
+  border: 1px solid rgba(6, 214, 160, 0.2);
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.3px;
+  margin-left: auto;
 }
 
 /* Карточка для неавторизованных */
@@ -1258,5 +1279,13 @@ const initials = computed(() => {
 .admin-clear-btn:hover {
   background: rgba(0, 0, 0, 0.4);
   border-color: rgba(255, 255, 255, 0.5);
+}
+
+.app-version {
+  text-align: center;
+  font-size: 0.8rem;
+  color: #475569;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
 }
 </style>
