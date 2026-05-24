@@ -34,11 +34,10 @@ export class BarcodeScanner {
     }
 
     const defaultConfig = {
-      fps: 15,
-      qrbox: { width: 400, height: 250 },
+      fps: 30,
+      qrbox: { width: 300, height: 150 },
       disableFlip: false,
-      showTorchButtonIfSupported: true,
-      formats: [
+      formatsToSupport: [
         Html5QrcodeSupportedFormats.EAN_13,
         Html5QrcodeSupportedFormats.EAN_8,
         Html5QrcodeSupportedFormats.CODE_128,
@@ -60,10 +59,15 @@ export class BarcodeScanner {
         throw new Error('Сканер не инициализирован — вызовите init() перед start()')
       }
 
-      // Запускаем сканирование — указанная камера или задняя по умолчанию
-      const cameraConfig = config.deviceId
-        ? { deviceId: { exact: config.deviceId } }
-        : { facingMode: 'environment' }
+      // Запускаем сканирование — указанная камера или любая доступная
+      let cameraConfig
+      if (config.deviceId) {
+        cameraConfig = { deviceId: { exact: config.deviceId } }
+      } else {
+        const cameras = await getAvailableCameras()
+        const backCam = cameras.find((d) => /back|environment|rear/i.test(d.label))
+        cameraConfig = backCam ? { deviceId: backCam.deviceId } : { facingMode: 'environment' }
+      }
 
       await this.scanner.start(
         cameraConfig,
@@ -196,11 +200,9 @@ export async function checkCameraSupport() {
     return false
   }
 
-  // Пробуем получить доступ к камере
+  // Пробуем получить доступ к камере — без strict facingMode для десктопа
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' }
-    })
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true })
     stream.getTracks().forEach((track) => track.stop())
     return true
   } catch {

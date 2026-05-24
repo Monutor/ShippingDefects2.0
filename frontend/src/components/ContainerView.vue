@@ -483,8 +483,12 @@ function handleScannerModalUpdate(val) {
       </div>
       <div class="scanner-element rounded-2xl mb-4 relative">
         <div :id="scanner.scannerElementId" class="w-full"></div>
-        <div class="scan-line"></div>
-        <div class="scan-frame"></div>
+        <div v-if="scanner.isScanning.value" class="scan-line"></div>
+        <div
+          v-if="scanner.scanFlashBounds.value"
+          class="scan-flash"
+          :style="scanner.scanFlashBounds.value"
+        ></div>
         <button
           class="torch-btn"
           :class="{ active: scanner.flashlight.value }"
@@ -633,34 +637,28 @@ main {
   min-height: 250px;
   background: #0f172a;
 }
-.scan-frame {
-  position: absolute;
-  inset: 10%;
-  border: 3px solid rgba(236, 72, 153, 0.8);
-  border-radius: 16px;
-  pointer-events: none;
-  z-index: 10;
-  box-shadow: 0 0 15px rgba(236, 72, 153, 0.3);
-}
 .scan-line {
   position: absolute;
-  left: 10%;
-  right: 10%;
+  left: 50%;
+  top: 50%;
+  width: 300px;
   height: 3px;
-  background: linear-gradient(90deg, transparent, #ec4899, transparent);
+  background: #ef4444;
   z-index: 11;
   pointer-events: none;
-  animation: scan 2s ease-in-out infinite;
-  box-shadow: 0 0 15px rgba(236, 72, 153, 0.6);
+  transform: translate(-50%, -50%);
 }
-@keyframes scan {
-  0%,
-  100% {
-    top: 20%;
-  }
-  50% {
-    top: 78%;
-  }
+.scan-flash {
+  position: absolute;
+  background: rgba(34, 197, 94, 0.4);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 12;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+}
+.scan-flash--frame {
+  inset: 10%;
+  border-radius: 16px;
 }
 .torch-btn {
   position: absolute;

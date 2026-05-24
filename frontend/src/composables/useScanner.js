@@ -23,6 +23,7 @@ export function useScanner(options = {}) {
 
   const flashlight = ref(false)
   const torchSupported = ref(false)
+  const scanFlashBounds = ref(null)
 
   const cameras = ref([])
   const selectedCameraId = ref(null)
@@ -63,23 +64,36 @@ export function useScanner(options = {}) {
 
     try {
       let lastBarcode = ''
-      await scanner.start(async (decodedText) => {
-        const barcode = decodedText?.trim()
-        if (!barcode || barcode === lastBarcode) return
-        lastBarcode = barcode
+      await scanner.start(
+        async (decodedText, _decodedResult) => {
+          const barcode = decodedText?.trim()
+          if (!barcode || barcode === lastBarcode) return
+          lastBarcode = barcode
 
-        const upper = barcode.toUpperCase()
-        if (upper.startsWith('Z') && upper.length < 13) {
-          if (navigator.vibrate) navigator.vibrate(100)
-          window.showToast('Штрихкод повреждён, повторите')
-          return
-        }
+          const upper = barcode.toUpperCase()
+          if (upper.startsWith('Z') && upper.length < 13) {
+            if (navigator.vibrate) navigator.vibrate(100)
+            window.showToast('Штрихкод повреждён, повторите')
+            return
+          }
 
-        turnOffFlashlight()
-        if (onScanSuccess) await onScanSuccess(barcode)
-        stopScanner()
-        if (onScanComplete) onScanComplete()
-      }, { deviceId: selectedCameraId.value })
+          scanFlashBounds.value = {
+            left: '0',
+            width: '100%',
+            top: '50%',
+            height: '50px',
+            transform: 'translateY(-50%)'
+          }
+
+          turnOffFlashlight()
+          await new Promise((resolve) => setTimeout(resolve, 300))
+          scanFlashBounds.value = null
+          if (onScanSuccess) await onScanSuccess(barcode)
+          stopScanner()
+          if (onScanComplete) onScanComplete()
+        },
+        { deviceId: selectedCameraId.value }
+      )
       torchSupported.value = !!scanner._torchSupported
     } catch (err) {
       window.showToast(err.message || 'Ошибка запуска камеры')
@@ -154,6 +168,7 @@ export function useScanner(options = {}) {
     handleTsdInput,
     flashlight,
     torchSupported,
+    scanFlashBounds,
     toggleFlashlight,
     cameras,
     selectedCameraId,
