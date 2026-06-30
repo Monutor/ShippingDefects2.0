@@ -30,7 +30,7 @@ jobs:
           PGPASSWORD: ${{ secrets.PG_PASSWORD }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: warehouse-brain-db-backup
           path: warehouse-brain-*.dump
