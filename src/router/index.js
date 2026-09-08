@@ -46,6 +46,11 @@ const router = createRouter({
       path: '/separate',
       name: 'separate',
       component: () => import('@/views/SeparateView.vue')
+    },
+    {
+      path: '/import',
+      name: 'import',
+      component: () => import('@/views/ImportView.vue')
     }
   ]
 })

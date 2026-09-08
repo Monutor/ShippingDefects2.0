@@ -399,6 +399,10 @@ export const dbStore = {
       const key = await db.box_items.add(row)
       return ok({ id: key, ...row }, null)
     },
+    // Все строки для карты «штрихкод → микс» (колонка места в таблице брака)
+    async getAll() {
+      return ok(await db.box_items.toArray())
+    },
     async deleteItem(boxId, barcode) {
       await db.box_items.where({ boxId, barcode }).delete()
       return ok(null, null)
@@ -464,6 +468,25 @@ export const dbStore = {
         })
       }
       return ok({ count: scans.length }, null)
+    }
+  },
+
+  settings: {
+    // Подтягивает монотонный счётчик (box_counter/pallet_counter) минимум до minValue.
+    // Нужно после импорта готовых контейнеров с «историческими» номерами:
+    // nextCounter инициализируется от max() только при пустом счётчике,
+    // а существующий меньший счётчик иначе выдаст уже занятый номер.
+    async ensureCounterAtLeast(key, minValue) {
+      try {
+        const stored = await db.settings.get(key)
+        const cur = stored?.value
+        if (typeof cur !== 'number' || !Number.isFinite(cur) || cur < minValue) {
+          await db.settings.put({ key, value: minValue })
+        }
+        return ok(null, null)
+      } catch (e) {
+        return err(e?.message || 'counter failed')
+      }
     }
   },
 
@@ -577,6 +600,10 @@ export const dbStore = {
         order_num: 0
       })
       return ok({ id: key }, null)
+    },
+    // Все строки для карты «микс/товар → паллет» (колонка места в таблице брака)
+    async getAll() {
+      return ok(await db.pallet_items.toArray())
     },
     // Поиск inline-товара по штрихкоду в чужих паллетах, включая завершённые.
     // Нужно для проверки дубликатов: in-memory стор видит только активные паллеты,

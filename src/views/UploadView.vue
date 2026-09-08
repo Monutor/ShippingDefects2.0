@@ -1,6 +1,9 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useBrainStore } from '@/stores/brain'
+import { dbStore } from '@/lib/db'
+import { parseBarcodeToBrainNumber } from '@/utils/barcode'
+import { exportToExcel } from '@/utils/excel'
 import { Button, NavBar, Modal } from '@/components/ui'
 
 const brainStore = useBrainStore()
@@ -105,6 +108,92 @@ function isStopItem(item) {
   if (comment.includes('ждем решения')) return true
   return false
 }
+
+// Карта «штрихкод → место»: М3 (микс), П1 (паллет), М3 → П1 (микс в паллете), Отд (отдельные).
+// Строится один раз при показе таблицы, а не по запросу на строку.
+const locationMap = ref(new Map())
+
+function addLocationKey(map, barcode, label) {
+  if (!barcode) return
+  if (!map.has(barcode)) map.set(barcode, label)
+  const parsed = parseBarcodeToBrainNumber(barcode)
+  if (parsed && !map.has(parsed)) map.set(parsed, label)
+}
+
+async function loadLocations() {
+  const map = new Map()
+  try {
+    const boxesRes = await dbStore.boxes.getAll()
+    const boxNum = new Map((boxesRes.data || []).map((b) => [b.id, b.box_number]))
+    const palletsRes = await dbStore.pallets.getAll()
+    const palletNum = new Map((palletsRes.data || []).map((p) => [p.id, p.pallet_number]))
+
+    const boxToPallet = new Map()
+    const inlineToPallet = new Map()
+    const palletItemsRes = await dbStore.palletItems.getAll()
+    for (const r of palletItemsRes.data || []) {
+      const pn = palletNum.get(r.palletId)
+      if (pn == null) continue
+      if (r.source_type === 'box' && r.source_id != null && !boxToPallet.has(r.source_id)) {
+        boxToPallet.set(r.source_id, pn)
+      } else if (r.source_type === 'inline' || r.source_type === 'pallet') {
+        const code = String(r.item_barcode || r.source_id || '')
+        if (code && !inlineToPallet.has(code)) inlineToPallet.set(code, pn)
+      }
+    }
+
+    const boxItemsRes = await dbStore.boxItems.getAll()
+    for (const r of boxItemsRes.data || []) {
+      const bn = boxNum.get(r.boxId)
+      if (bn == null || !r.barcode) continue
+      let label = `М${bn}`
+      const pn = boxToPallet.get(r.boxId)
+      if (pn != null) label += ` → П${pn}`
+      addLocationKey(map, r.barcode, label)
+    }
+    for (const [code, pn] of inlineToPallet) addLocationKey(map, code, `П${pn}`)
+
+    const sepRes = await dbStore.separateItems.getAll()
+    for (const i of sepRes.data || []) {
+      if (i.barcode) addLocationKey(map, i.barcode, 'Отд')
+    }
+  } catch {
+    // ignore — колонка покажет прочерки
+  }
+  locationMap.value = map
+}
+
+function itemLocation(item) {
+  return locationMap.value.get(String(item.number || '')) || '—'
+}
+
+// Выгрузка всей базы брака в Excel с колонкой «Место»
+function downloadDatabase() {
+  const rows = brainStore.items.map((item) => ({
+    Номер: item.number || '',
+    Наименование: item.name || '',
+    'Код товара': item.article || '',
+    Комментарий: item.comment || '',
+    Место: itemLocation(item)
+  }))
+  const result = exportToExcel(rows, 'База_брака')
+  if (result.success) {
+    window.showToast(`База выгружена: ${rows.length} товаров`, 2500, 'success')
+  } else {
+    window.showToast('Не удалось выгрузить базу')
+  }
+}
+
+onMounted(() => {
+  if (brainStore.hasDatabase) loadLocations()
+})
+
+watch(
+  () => brainStore.hasDatabase,
+  (has) => {
+    if (has) loadLocations()
+  }
+)
 </script>
 
 <template>
@@ -131,12 +220,17 @@ function isStopItem(item) {
       <div v-else class="database-section">
         <!-- Заголовок -->
         <div class="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl p-4 mb-4">
-          <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between gap-3">
             <div>
               <h3 class="font-semibold text-slate-100">Текущая база</h3>
               <p class="text-sm text-slate-400 mt-1">{{ brainStore.totalItems }} товаров</p>
             </div>
-            <div class="text-sm text-slate-400">Страница {{ currentPage }} из {{ totalPages }}</div>
+            <div class="flex flex-col items-end gap-2">
+              <div class="text-sm text-slate-400">
+                Страница {{ currentPage }} из {{ totalPages }}
+              </div>
+              <Button size="sm" @click="downloadDatabase">Скачать</Button>
+            </div>
           </div>
         </div>
 
@@ -195,6 +289,7 @@ function isStopItem(item) {
               <span class="th-name">Наименование</span>
               <span class="th-article">Код</span>
               <span class="th-comment">Комментарий</span>
+              <span class="th-place">Место</span>
             </div>
             <div
               v-for="(item, index) in paginatedItems"
@@ -207,6 +302,9 @@ function isStopItem(item) {
               <span class="td-comment">
                 <span v-if="isStopItem(item)" class="stop-badge">⛔</span>
                 {{ item.comment || '—' }}
+              </span>
+              <span class="td-place" :class="{ empty: itemLocation(item) === '—' }">
+                {{ itemLocation(item) }}
               </span>
             </div>
           </div>
@@ -301,7 +399,8 @@ function isStopItem(item) {
 .td-number,
 .td-name,
 .td-article,
-.td-comment {
+.td-comment,
+.td-place {
   display: block;
   grid-column: auto !important;
   white-space: nowrap;
@@ -361,11 +460,29 @@ function isStopItem(item) {
   flex-shrink: 0;
 }
 
+.td-place {
+  font-family: monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #7dd3fc;
+  background: rgba(125, 211, 252, 0.12);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  display: inline-block;
+  margin-bottom: 0.25rem;
+}
+
+.td-place.empty {
+  color: #475569;
+  background: transparent;
+  padding: 0.25rem 0;
+}
+
 /* Табличный вид для планшетов и десктопов (от 640px) */
 @media (min-width: 640px) {
   .table-header {
     display: grid;
-    grid-template-columns: 1.5fr 3fr 1.5fr 2.5fr;
+    grid-template-columns: 1.4fr 2.6fr 1.2fr 2.2fr 0.9fr;
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     background: rgba(255, 255, 255, 0.03);
@@ -377,7 +494,7 @@ function isStopItem(item) {
 
   .table-row {
     display: grid;
-    grid-template-columns: 1.5fr 3fr 1.5fr 2.5fr;
+    grid-template-columns: 1.4fr 2.6fr 1.2fr 2.2fr 0.9fr;
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     background: transparent;
@@ -386,7 +503,8 @@ function isStopItem(item) {
   .td-number,
   .td-name,
   .td-article,
-  .td-comment {
+  .td-comment,
+  .td-place {
     margin-bottom: 0;
   }
 

@@ -84,6 +84,68 @@ export function exportToExcel(data, filename) {
 }
 
 /**
+ * Дублирует блок строк 1..endRow того же листа ниже (для второй пломбы на короб).
+ * Копируются значения, стили, высоты строк и мёрджи. Между копиями — строка
+ * «линия разреза». ВАЖНО: при добавлении строк в пломбу обнови endRow в вызове.
+ */
+function duplicateSheetBlock(sheet, endRow, gapRows = 3) {
+  const dstStart = endRow + gapRows + 1
+  const colCount = sheet.columnCount || 2
+
+  const cutRowNum = endRow + 1
+  sheet.mergeCells(`A${cutRowNum}:B${cutRowNum}`)
+  const cutCell = sheet.getCell(`A${cutRowNum}`)
+  cutCell.value = '✂ линия разреза'
+  cutCell.font = { italic: true, size: 9, color: { argb: 'FF999999' } }
+  cutCell.alignment = { horizontal: 'center', vertical: 'middle' }
+
+  for (let r = 1; r <= endRow; r++) {
+    const src = sheet.getRow(r)
+    const dst = sheet.getRow(dstStart + r - 1)
+    dst.height = src.height
+    for (let c = 1; c <= colCount; c++) {
+      const cell = src.getCell(c)
+      const d = dst.getCell(c)
+      d.value = cell.value
+      if (cell.font) d.font = { ...cell.font }
+      if (cell.fill) d.fill = { ...cell.fill }
+      if (cell.border) d.border = { ...cell.border }
+      if (cell.alignment) d.alignment = { ...cell.alignment }
+      if (cell.numFmt) d.numFmt = cell.numFmt
+    }
+  }
+
+  // Срез массива — mergeCells дописывает в model.merges, итерируемся по копии
+  const merges = [...((sheet.model && sheet.model.merges) || [])]
+  const offset = dstStart - 1
+  for (const m of merges) {
+    const parsed = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(m)
+    if (!parsed) continue
+    sheet.mergeCells(
+      `${parsed[1]}${Number(parsed[2]) + offset}:${parsed[3]}${Number(parsed[4]) + offset}`
+    )
+  }
+}
+
+/**
+ * Лист с огромным номером контейнера по центру — для нумерации коробок/паллет.
+ * Пример: «МИКС-1», «ПАЛЛЕТ-2».
+ */
+function addLabelSheet(workbook, text) {
+  const sheet = workbook.addWorksheet('Номер')
+  // Широкий диапазон: мёрженная ячейка обрезает текст по своим границам,
+  // поэтому под огромный шрифт отводим 8 колонок, а не одну
+  sheet.columns = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((key) => ({ key, width: 20 }))
+  sheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 1 }
+  for (let r = 8; r <= 12; r++) sheet.getRow(r).height = 40
+  sheet.mergeCells('A8:H12')
+  const cell = sheet.getCell('A8')
+  cell.value = text
+  cell.font = { bold: true, size: 72 }
+  cell.alignment = { horizontal: 'center', vertical: 'middle' }
+}
+
+/**
  * Экспорт товаров конкретного короба с пломбой
  * @param {Object} box - объект короба
  * @returns {Object} результат экспорта
@@ -316,6 +378,10 @@ export async function exportBoxToExcel(box) {
     const boxNumberLabel = box.number ?? box.box_number ?? 'без_номера'
     const fullName = `Микс_${boxNumberLabel}_${timestamp}.xlsx`
 
+    // Вторая пломба на том же листе (опечатка с двух сторон) + лист с огромным номером
+    duplicateSheetBlock(sealSheet, 8)
+    addLabelSheet(workbook, `МИКС-${boxNumberLabel}`)
+
     // Скачиваем файл
     const buffer = await workbook.xlsx.writeBuffer()
     const blob = new Blob([buffer], {
@@ -463,6 +529,10 @@ export async function exportSeparateToExcel(items) {
 
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
     const fullName = `Отдельные_${timestamp}.xlsx`
+
+    // Вторая пломба на том же листе (опечатка с двух сторон) + лист с огромным номером
+    duplicateSheetBlock(sealSheet, 8)
+    addLabelSheet(workbook, 'ОТДЕЛЬНЫЕ')
 
     const buffer = await workbook.xlsx.writeBuffer()
     const blob = new Blob([buffer], {
@@ -783,6 +853,10 @@ export async function exportPalletToExcel(pallet) {
 
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
     const fullName = `Паллет_${pallet.number}_${timestamp}.xlsx`
+
+    // Вторая пломба на том же листе (опечатка с двух сторон) + лист с огромным номером
+    duplicateSheetBlock(sealSheet, 9)
+    addLabelSheet(workbook, `ПАЛЛЕТ-${pallet.number}`)
 
     const buffer = await workbook.xlsx.writeBuffer()
     const blob = new Blob([buffer], {

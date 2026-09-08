@@ -133,6 +133,21 @@ function autoMapColumns(headers) {
       </div>
     </div>
 
+    <!-- Импорт готовых данных -->
+    <div class="reset-section max-w-[500px] w-full mt-4">
+      <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h3 class="font-semibold text-slate-100">Готовые миксы и паллеты</h3>
+            <p class="text-sm text-slate-400 mt-1">
+              Импорт из выгрузок Микс_* / Паллет_* / Отдельные_*
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" @click="router.push('/import')">Импорт</Button>
+        </div>
+      </div>
+    </div>
+
     <!-- Сброс локальных данных -->
     <div class="reset-section max-w-[500px] w-full mt-6">
       <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-4">
