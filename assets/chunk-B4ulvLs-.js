@@ -1,0 +1,1 @@
+import{t as e}from"./chunk-Cw7-GHBI.js";export{e as useBoxesStore};

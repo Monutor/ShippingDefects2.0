@@ -1,0 +1,1 @@
+import{t as e}from"./chunk-KDlS46Av.js";export{e as useBoxesStore};

@@ -1,0 +1,1 @@
+import{t as e}from"./chunk-C_BLPVhj.js";export{e as useBoxesStore};

@@ -1,0 +1,1 @@
+import{W as e,g as t}from"./chunk-4ELVOifY.js";import{a as n}from"./chunk-BDIR8D-w.js";var r=t(`collector`,()=>{let t=e(``);async function r(){return t.value=(await n()).employeeId?.trim()||``,!0}return{employeeId:t,initProfile:r}});export{r as t};
