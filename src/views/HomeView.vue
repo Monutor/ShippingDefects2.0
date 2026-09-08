@@ -3,22 +3,13 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBrainStore } from '@/stores/brain'
 import { readExcelFile, getColumnHeaders } from '@/utils/excel'
-import { Button, Modal, FileUpload } from '@/components/ui'
-import { dbStore } from '@/lib/db'
+import { FileUpload } from '@/components/ui'
 
 const router = useRouter()
 const brainStore = useBrainStore()
 
 const isLoading = ref(false)
 const error = ref(null)
-const showResetModal = ref(false)
-
-async function confirmReset() {
-  await dbStore.resetLocalData()
-  showResetModal.value = false
-  window.showToast('✅ Локальные данные очищены. Перезагрузка…')
-  setTimeout(() => window.location.reload(), 600)
-}
 
 async function handleFileSelect(file) {
   if (!file) return
@@ -111,6 +102,9 @@ function autoMapColumns(headers) {
   <div class="home-page">
     <!-- Header -->
     <div class="header">
+      <button class="settings-btn" aria-label="Настройки" @click="router.push('/settings')">
+        <van-icon name="setting-o" size="22" aria-hidden="true" />
+      </button>
       <div class="header-icon">📦</div>
       <h1 class="header-title">Учёт брака</h1>
       <p class="header-subtitle">Система складского учёта</p>
@@ -130,34 +124,6 @@ function autoMapColumns(headers) {
       <div v-if="error" class="error-message">
         <van-icon name="warning-o" size="24" color="#f87171" aria-hidden="true" />
         <p>{{ error }}</p>
-      </div>
-    </div>
-
-    <!-- Импорт готовых данных -->
-    <div class="reset-section max-w-[500px] w-full mt-4">
-      <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-4">
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <h3 class="font-semibold text-slate-100">Готовые миксы и паллеты</h3>
-            <p class="text-sm text-slate-400 mt-1">
-              Импорт из выгрузок Микс_* / Паллет_* / Отдельные_*
-            </p>
-          </div>
-          <Button variant="secondary" size="sm" @click="router.push('/import')">Импорт</Button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Сброс локальных данных -->
-    <div class="reset-section max-w-[500px] w-full mt-6">
-      <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-4">
-        <div class="flex items-center justify-between gap-3">
-          <div>
-            <h3 class="font-semibold text-slate-100">Очистка данных</h3>
-            <p class="text-sm text-slate-400 mt-1">Удалить все локальные данные и начать заново</p>
-          </div>
-          <Button variant="danger" size="sm" @click="showResetModal = true">Сбросить</Button>
-        </div>
       </div>
     </div>
 
@@ -194,8 +160,33 @@ function autoMapColumns(headers) {
 
 /* Header */
 .header {
+  position: relative;
   text-align: center;
   margin-bottom: 2rem;
+  width: 100%;
+  max-width: 500px;
+}
+
+.settings-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(51, 65, 85, 0.5);
+  border: 1px solid rgba(71, 85, 105, 0.5);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.settings-btn:hover {
+  background: rgba(51, 65, 85, 0.8);
+  color: #f1f5f9;
 }
 
 .header-icon {

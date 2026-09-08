@@ -13,7 +13,7 @@ npm run build        # base '/ShippingDefects2.0/' for GitHub Pages; `npm run de
 ## Architecture
 
 - Entrypoints: `src/main.js` (Pinia + router + global UI registration + `ensureDbReady()` + `initializeApp()`), `src/router/index.js`, `src/lib/db.js` (all persistence, `dbStore` facade — no network layer).
-- Routes (lazy-loaded, 9 total): `/`, `/upload`, `/mix-view`, `/pallet-view`, `/boxes`, `/separate`, `/mix/:boxId?`, `/pallet/:palletId?`, `/import`. There is no `/login` or `/user`.
+- Routes (lazy-loaded, 11 total): `/`, `/upload`, `/mix-view`, `/pallet-view`, `/boxes`, `/separate`, `/mix/:boxId?`, `/pallet/:palletId?`, `/import`, `/settings`, `/search`. There is no `/login` or `/user`.
 - `src/components/ContainerView.vue` — shared scanner-modal + item-list + status-bar shell used by Mix/Pallet views.
 - `src/stores/`: `boxes.js`, `separate.js`, `brain.js`, `pallet.js` + `pallet/` (`crud.js`, `loading.js`, `sync.js`). Undo = in-memory action history (max 50) in boxes/separate/pallet-sync; boxes store sets `{ persist: false }` — business data lives only in IndexedDB, Pinia persist is session/UI state only.
 - `@/` → `src/`. UI components globally registered from `@/components/ui` barrel — but barrel omits `Picker.vue`, `Tab.vue`, `Tabs.vue`; import those directly. Vant is icons only (`VanIcon`); `preflight: false` in `tailwind.config.js` is required — do not re-enable (breaks Vant).

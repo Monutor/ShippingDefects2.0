@@ -12,7 +12,8 @@ const activeIndex = computed(() => {
     '/mix-view': 2,
     '/pallet-view': 3,
     '/separate': 4,
-    '/boxes': 5
+    '/boxes': 5,
+    '/search': 6
   }
   return routeMap[route.path] ?? 0
 })
@@ -39,7 +40,8 @@ const items = [
     icon: `${import.meta.env.BASE_URL}img/navIcons/result-icon.svg`,
     text: 'Результаты',
     path: '/boxes'
-  }
+  },
+  { vanIcon: 'search', text: 'Поиск', path: '/search' }
 ]
 
 function handleItemClick(index, path) {
@@ -61,12 +63,20 @@ function handleItemClick(index, path) {
           @click="handleItemClick(index, item.path)"
         >
           <img
+            v-if="item.icon"
             :src="item.icon"
             :alt="item.text"
             :class="[
               'w-5 h-5 transition-opacity duration-200',
               activeIndex === index ? 'icon-active' : ''
             ]"
+          />
+          <van-icon
+            v-else-if="item.vanIcon"
+            :name="item.vanIcon"
+            size="20"
+            :class="[activeIndex === index ? 'icon-active' : '']"
+            aria-hidden="true"
           />
           <span class="text-xs">{{ item.text }}</span>
         </button>
@@ -116,6 +126,20 @@ function handleItemClick(index, path) {
 /* Активная иконка */
 .tabbar-item.active img {
   opacity: 1;
+}
+
+/* Vant-иконка (пункт «Поиск») — те же состояния, что у SVG */
+.tabbar-item .van-icon {
+  opacity: 0.6;
+  color: #64748b;
+  transition:
+    opacity 0.2s ease,
+    color 0.2s ease;
+}
+
+.tabbar-item.active .van-icon {
+  opacity: 1;
+  color: #60a5fa;
 }
 
 /* Текст */

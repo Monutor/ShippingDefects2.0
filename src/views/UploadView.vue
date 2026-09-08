@@ -1,9 +1,8 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useBrainStore } from '@/stores/brain'
-import { dbStore } from '@/lib/db'
-import { parseBarcodeToBrainNumber } from '@/utils/barcode'
 import { exportToExcel } from '@/utils/excel'
+import { buildLocationIndex, lookupLocation } from '@/utils/locations'
 import { Button, NavBar, Modal } from '@/components/ui'
 
 const brainStore = useBrainStore()
@@ -109,62 +108,20 @@ function isStopItem(item) {
   return false
 }
 
-// Карта «штрихкод → место»: М3 (микс), П1 (паллет), М3 → П1 (микс в паллете), Отд (отдельные).
+// Индекс мест хранения (общий модуль utils/locations): М3, П1, М3 → П1, Отд.
 // Строится один раз при показе таблицы, а не по запросу на строку.
-const locationMap = ref(new Map())
-
-function addLocationKey(map, barcode, label) {
-  if (!barcode) return
-  if (!map.has(barcode)) map.set(barcode, label)
-  const parsed = parseBarcodeToBrainNumber(barcode)
-  if (parsed && !map.has(parsed)) map.set(parsed, label)
-}
+const locationIndex = ref(null)
 
 async function loadLocations() {
-  const map = new Map()
   try {
-    const boxesRes = await dbStore.boxes.getAll()
-    const boxNum = new Map((boxesRes.data || []).map((b) => [b.id, b.box_number]))
-    const palletsRes = await dbStore.pallets.getAll()
-    const palletNum = new Map((palletsRes.data || []).map((p) => [p.id, p.pallet_number]))
-
-    const boxToPallet = new Map()
-    const inlineToPallet = new Map()
-    const palletItemsRes = await dbStore.palletItems.getAll()
-    for (const r of palletItemsRes.data || []) {
-      const pn = palletNum.get(r.palletId)
-      if (pn == null) continue
-      if (r.source_type === 'box' && r.source_id != null && !boxToPallet.has(r.source_id)) {
-        boxToPallet.set(r.source_id, pn)
-      } else if (r.source_type === 'inline' || r.source_type === 'pallet') {
-        const code = String(r.item_barcode || r.source_id || '')
-        if (code && !inlineToPallet.has(code)) inlineToPallet.set(code, pn)
-      }
-    }
-
-    const boxItemsRes = await dbStore.boxItems.getAll()
-    for (const r of boxItemsRes.data || []) {
-      const bn = boxNum.get(r.boxId)
-      if (bn == null || !r.barcode) continue
-      let label = `М${bn}`
-      const pn = boxToPallet.get(r.boxId)
-      if (pn != null) label += ` → П${pn}`
-      addLocationKey(map, r.barcode, label)
-    }
-    for (const [code, pn] of inlineToPallet) addLocationKey(map, code, `П${pn}`)
-
-    const sepRes = await dbStore.separateItems.getAll()
-    for (const i of sepRes.data || []) {
-      if (i.barcode) addLocationKey(map, i.barcode, 'Отд')
-    }
+    locationIndex.value = await buildLocationIndex()
   } catch {
-    // ignore — колонка покажет прочерки
+    locationIndex.value = null
   }
-  locationMap.value = map
 }
 
 function itemLocation(item) {
-  return locationMap.value.get(String(item.number || '')) || '—'
+  return lookupLocation(locationIndex.value, item.number)?.label || '—'
 }
 
 // Выгрузка всей базы брака в Excel с колонкой «Место»

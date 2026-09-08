@@ -12,7 +12,15 @@ defineEmits(['request-delete', 'load-items', 'export-all'])
 
 const router = useRouter()
 
-const boxesReverse = computed(() => [...props.boxes].reverse())
+// Сортировки в БД нет (toArray без orderBy отдаёт в порядке случайных UUID),
+// поэтому сортируем здесь: новые сверху по дате создания, при равной — по номеру
+const sortedBoxes = computed(() =>
+  [...props.boxes].sort((a, b) => {
+    const byDate = String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
+    if (byDate !== 0) return byDate
+    return Number(b.number || 0) - Number(a.number || 0)
+  })
+)
 
 function formatDate(dateString) {
   return new Date(dateString).toLocaleString('ru-RU', {
@@ -42,9 +50,9 @@ function formatDate(dateString) {
 
     <div v-else class="boxes-list py-4">
       <SwipeCard
-        v-for="(box, index) in boxesReverse"
+        v-for="(box, index) in sortedBoxes"
         :key="box.id"
-        @delete="$emit('request-delete', boxes.length - 1 - index, box)"
+        @delete="$emit('request-delete', index, box)"
       >
         <div class="box-card p-4 cursor-pointer" @click="router.push(`/mix/${box.id}`)">
           <div class="flex items-start justify-between gap-3">
