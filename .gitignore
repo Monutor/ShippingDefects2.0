@@ -36,6 +36,10 @@ docs
 
 # Opencode
 .opencode/
+.zvec-grep
+
+# Playwright MCP (локальное состояние браузера)
+.playwright-mcp/
 
 # Переменные окружения
 .env

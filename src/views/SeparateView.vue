@@ -1,0 +1,645 @@
+<script setup>
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useBrainStore } from '@/stores/brain'
+import { useSeparateStore } from '@/stores/separate'
+import { useScanner } from '@/composables/useScanner'
+import { parseBarcodeToBrainNumber } from '@/utils/barcode'
+import { initSounds, playSound } from '@/utils/sound'
+import { exportSeparateToExcel } from '@/utils/excel'
+import { Button, Input, Badge, NavBar, Modal, Loader } from '@/components/ui'
+
+const brainStore = useBrainStore()
+const separateStore = useSeparateStore()
+
+window.isProcessingStopItem = false
+
+const showStopItemModal = ref(false)
+const currentStopItem = ref(null)
+const showDuplicateModal = ref(false)
+const currentDuplicateItem = ref(null)
+const isLoading = ref(false)
+
+// SeparateView использует inline-сканер (не модалку) — showScanner управляет видимостью элемента
+const showScanner = ref(false)
+
+function handleKeyDown(event) {
+  if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+    event.preventDefault()
+    performUndo()
+  }
+}
+
+async function performUndo() {
+  const undoneItem = await separateStore.undoLastAction()
+  if (undoneItem) {
+    playSound('undo')
+    if (navigator.vibrate) navigator.vibrate([50, 30, 50])
+    window.showToast(`↩ Отменено: ${undoneItem.name}`)
+  } else {
+    window.showToast('Нечего отменять')
+  }
+}
+
+async function handleScanResult(barcode) {
+  if (window.isProcessingStopItem) return { success: false, error: 'processing' }
+  if (!barcode) return { success: false, error: 'no_barcode' }
+
+  const parsedBarcode = parseBarcodeToBrainNumber(barcode)
+  const finalBarcode = parsedBarcode || barcode
+  const item = brainStore.findByBarcode(finalBarcode)
+
+  if (!item) {
+    playSound('error')
+    if (navigator.vibrate) navigator.vibrate([50, 50, 50])
+    window.showToast(`Товар отсутствует в БД: ${finalBarcode}`)
+    return { success: false, error: 'not_found' }
+  }
+
+  if (brainStore.isStopItem(item)) {
+    playSound('error')
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100])
+    currentStopItem.value = item
+    showStopItemModal.value = true
+    sc.stopScanner()
+    showScanner.value = false
+    return { success: false, error: 'stop_item' }
+  }
+
+  if (separateStore.isDuplicate(finalBarcode)) {
+    playSound('error')
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100])
+    currentDuplicateItem.value = item
+    showDuplicateModal.value = true
+    sc.stopScanner()
+    showScanner.value = false
+    return { success: false, error: 'duplicate' }
+  }
+
+  const result_add = await separateStore.addItem(item)
+  if (result_add?.success) {
+    playSound('success')
+    if (navigator.vibrate) navigator.vibrate([50, 30, 50])
+    window.showToast(`✓ Добавлено: ${item.name}`)
+    sc.stopScanner()
+    showScanner.value = false
+    return { success: true }
+  } else if (result_add?.error === 'duplicate') {
+    playSound('error')
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100])
+    currentDuplicateItem.value = item
+    showDuplicateModal.value = true
+    sc.stopScanner()
+    showScanner.value = false
+    return { success: false, error: 'duplicate' }
+  } else if (
+    result_add?.error === 'duplicate_in_box' ||
+    result_add?.error === 'duplicate_in_pallet'
+  ) {
+    playSound('error')
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100])
+    const where =
+      result_add.error === 'duplicate_in_box'
+        ? `в миксе №${result_add.containerNumber}`
+        : `в паллете №${result_add.containerNumber}`
+    window.showToast(`Товар уже ${where}`, 3000, 'error')
+    return { success: false, error: result_add.error }
+  } else {
+    playSound('error')
+    window.showToast('Ошибка добавления')
+    return { success: false, error: 'add_failed' }
+  }
+}
+
+// Инициализация сканера через композабл
+const sc = useScanner({
+  elementId: 'barcode-scanner',
+  onScanSuccess: handleScanResult
+})
+
+// SeparateView: камера inline — startScanner показывает элемент и запускает камеру
+async function startScanner() {
+  showScanner.value = true
+  await nextTick()
+  await sc.startScanner()
+}
+
+function stopScanner() {
+  sc.stopScanner()
+  showScanner.value = false
+}
+
+function handleStopScanner() {
+  stopScanner()
+}
+
+// Watch на scanMode — автостарт камеры при переключении
+watch(sc.scanMode, (newMode, oldMode) => {
+  if (newMode === oldMode) return
+  localStorage.setItem('separateScanMode', newMode)
+  stopScanner()
+  window.showToast(`Режим: ${newMode === 'tsd' ? 'ТСД' : 'Камера'}`)
+  if (newMode === 'camera') sc.fetchCameras()
+})
+
+onMounted(async () => {
+  initSounds()
+  const savedMode = localStorage.getItem('separateScanMode')
+  if (savedMode === 'tsd' || savedMode === 'camera') sc.scanMode.value = savedMode
+
+  isLoading.value = true
+  try {
+    await separateStore.loadSeparateItems()
+  } finally {
+    isLoading.value = false
+  }
+
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+onUnmounted(() => {
+  sc.cleanupScanner()
+  showScanner.value = false
+  window.removeEventListener('keydown', handleKeyDown)
+})
+
+const showRemoveModal = ref(false)
+const removeIndex = ref(null)
+
+function requestRemoveItem(index) {
+  removeIndex.value = index
+  showRemoveModal.value = true
+}
+
+async function confirmRemove() {
+  if (removeIndex.value !== null) {
+    await separateStore.removeItem(removeIndex.value)
+    window.showToast('Товар удалён')
+  }
+  showRemoveModal.value = false
+  removeIndex.value = null
+}
+
+const showFinishModal = ref(false)
+
+function finishSeparate() {
+  if (separateStore.totalItems === 0) {
+    window.showToast('Список пуст')
+    return
+  }
+  showFinishModal.value = true
+}
+
+async function confirmFinish() {
+  showFinishModal.value = false
+  const exportResult = await exportSeparateToExcel(separateStore.items)
+  if (exportResult.success) {
+    window.showToast(`Файл скачан: ${exportResult.filename}`)
+    separateStore.clearAll()
+  } else {
+    window.showToast('Ошибка экспорта: ' + exportResult.error)
+  }
+}
+
+const showClearModal = ref(false)
+
+async function confirmClear() {
+  await separateStore.clearAll()
+  window.showToast('Список очищен')
+  showClearModal.value = false
+}
+</script>
+
+<template>
+  <div
+    class="separate-view min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 pb-20"
+  >
+    <NavBar
+      title="Отдельные товары"
+      left-text="Назад"
+      left-arrow
+      right-text="Очистить"
+      :right-disabled="separateStore.totalItems === 0"
+      @click-left="$router.back()"
+      @click-right="showClearModal = true"
+    />
+
+    <main class="content px-4 py-4">
+      <div class="mode-switcher mb-4">
+        <div class="grid grid-cols-2 gap-3">
+          <button
+            :class="[
+              'py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2',
+              sc.scanMode.value === 'tsd'
+                ? 'bg-gradient-to-r from-primary-500 to-primary-700 text-white shadow-lg shadow-primary-500/30'
+                : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700'
+            ]"
+            @click="sc.scanMode.value = 'tsd'"
+          >
+            <img src="/img/bank-terminal.svg" alt="ТСД" class="w-5 h-5" /> ТСД
+          </button>
+          <button
+            :class="[
+              'py-3.5 rounded-xl text-base font-semibold transition-all duration-200 border-none cursor-pointer flex items-center justify-center gap-2',
+              sc.scanMode.value === 'camera'
+                ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/30'
+                : 'bg-slate-800/80 text-slate-400 border border-slate-700 hover:bg-slate-700'
+            ]"
+            @click="sc.scanMode.value = 'camera'"
+          >
+            <img src="/img/camera-svg.svg" alt="Камера" class="w-5 h-5" /> Камера
+          </button>
+        </div>
+      </div>
+
+      <div v-if="sc.scanMode.value === 'tsd'" class="tsd-input-wrapper mb-4">
+        <div class="flex items-center gap-2">
+          <Input
+            v-model="sc.tsdInput.value"
+            placeholder="Сканируйте или введите номер"
+            icon="scan"
+            clearable
+            class="flex-1"
+            @keyup.enter="sc.handleTsdInput(handleScanResult)"
+            @change="sc.handleTsdInput(handleScanResult)"
+            @blur="sc.handleTsdInput(handleScanResult)"
+          />
+          <Button size="md" @click="sc.handleTsdInput(handleScanResult)">Добавить</Button>
+        </div>
+        <p class="text-xs text-slate-500 mt-2 ml-2">
+          💡 Введите номер товара (например 45328) — префикс добавится автоматически
+        </p>
+      </div>
+
+      <div class="info-card mb-4">
+        <div
+          class="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-3 text-white shadow-lg shadow-emerald-500/20 border border-emerald-500/30"
+        >
+          <div class="flex items-center gap-4">
+            <div
+              class="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center text-2xl flex-shrink-0"
+            >
+              🚚
+            </div>
+            <div class="flex-1">
+              <h3 class="font-semibold text-lg mb-1">Отдельные товары</h3>
+              <p class="text-sm text-white/80">
+                Товаров: <span class="font-bold text-white">{{ separateStore.totalItems }}</span>
+              </p>
+            </div>
+            <Badge variant="success" class="px-2 py-2 text-center text-xs">1 товар = 1 место</Badge>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="sc.scanMode.value === 'camera'" class="scan-section mb-4">
+        <div v-if="sc.cameras.value.length > 1 && !sc.isScanning.value" class="mb-3 space-y-2">
+          <p class="text-xs text-slate-400">📷 Камера:</p>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="(cam, idx) in sc.cameras.value"
+              :key="cam.deviceId"
+              type="button"
+              :class="[
+                'px-3 py-2 rounded-lg text-sm border transition-colors cursor-pointer',
+                cam.deviceId === sc.selectedCameraId.value
+                  ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+              ]"
+              @click="sc.selectedCameraId.value = cam.deviceId"
+            >
+              {{ cam.label || `Камера ${idx + 1}` }}
+            </button>
+          </div>
+        </div>
+        <Button
+          :loading="sc.isScanning.value"
+          :class="[
+            'w-full py-4 rounded-2xl text-base font-semibold shadow-lg',
+            sc.isScanning.value
+              ? 'bg-gradient-to-r from-rose-500 to-rose-700 shadow-rose-500/30'
+              : 'bg-gradient-to-r from-emerald-500 to-teal-600 shadow-emerald-500/30'
+          ]"
+          @click="startScanner"
+        >
+          <van-icon
+            :name="sc.isScanning.value ? 'play-circle-o' : 'scan'"
+            size="20"
+            aria-hidden="true"
+          />
+          {{ sc.isScanning.value ? 'Сканирование...' : 'Старт' }}
+        </Button>
+        <p class="text-sm text-slate-500 mt-3 text-center">📷 Нажмите «Старт» для сканирования</p>
+      </div>
+
+      <div class="items-list-section mb-4">
+        <div
+          class="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl overflow-hidden"
+        >
+          <div class="p-4 border-b border-slate-700">
+            <h3 class="font-semibold text-slate-100 flex items-center gap-2">
+              <van-icon name="bag-o" class="text-primary-400" aria-hidden="true" /> Товары в списке
+            </h3>
+          </div>
+          <div class="p-4">
+            <Loader
+              v-if="isLoading || separateStore.isSyncing"
+              :text="isLoading ? 'Загрузка товаров...' : 'Синхронизация...'"
+            />
+            <div v-else-if="separateStore.totalItems === 0" class="text-center py-8">
+              <div
+                class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-3"
+              >
+                <van-icon name="bag-o" size="32" color="#64748b" aria-hidden="true" />
+              </div>
+              <p class="text-slate-400 text-sm">Пока нет товаров. Отсканируйте штрихкод.</p>
+            </div>
+            <div v-else class="items-list-detail space-y-2 max-h-96 overflow-y-auto scrollbar-thin">
+              <div
+                v-for="(item, index) in separateStore.items"
+                :key="index"
+                class="item-row p-3 rounded-xl transition-all duration-200"
+                :class="
+                  separateStore.lastScannedItem?.number === item.number
+                    ? 'bg-amber-500/20 border-2 border-amber-500'
+                    : 'bg-slate-700/50 hover:bg-slate-700'
+                "
+              >
+                <div class="flex items-center gap-3">
+                  <div
+                    class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-md"
+                  >
+                    <span class="text-xs font-bold text-white">{{
+                      String(index + 1).padStart(3, '0')
+                    }}</span>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-0.5">
+                      <span
+                        class="text-xs font-semibold text-primary-400 bg-primary-500/20 px-2 py-0.5 rounded-md border border-primary-500/30"
+                        >{{ item.article }}</span
+                      >
+                      <van-icon
+                        v-if="separateStore.lastScannedItem?.number === item.number"
+                        name="star"
+                        size="14"
+                        color="#fbbf24"
+                        class="mr-1"
+                        aria-hidden="true"
+                      />
+                    </div>
+                    <p class="text-sm font-medium text-slate-100 truncate">{{ item.name }}</p>
+                  </div>
+                  <div class="flex items-center gap-3 flex-shrink-0">
+                    <span class="text-xs font-mono text-slate-500">{{ item.number }}</span>
+                    <van-icon
+                      name="delete-o"
+                      size="20"
+                      color="#f87171"
+                      role="button"
+                      aria-label="Удалить товар"
+                      class="cursor-pointer hover:scale-110 transition-transform"
+                      @click="requestRemoveItem(index)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-actions flex gap-2">
+        <Button
+          class="basis-full"
+          variant="warning"
+          :disabled="!separateStore.canUndo"
+          :class="!separateStore.canUndo ? 'opacity-50' : ''"
+          @click="performUndo"
+          ><van-icon name="replay" aria-hidden="true" /> Отмена</Button
+        >
+        <Button
+          class="basis-full"
+          variant="success"
+          :disabled="separateStore.totalItems === 0"
+          :class="separateStore.totalItems === 0 ? 'opacity-50' : ''"
+          @click="finishSeparate"
+          ><van-icon name="down" aria-hidden="true" /> Завершить</Button
+        >
+      </div>
+    </main>
+
+    <!-- Модальное окно сканера -->
+    <Modal
+      :model-value="showScanner"
+      confirm-text="Стоп"
+      confirm-color="danger"
+      @update:model-value="
+        (val) => {
+          showScanner = val
+          if (!val) sc.stopScanner()
+        }
+      "
+      @confirm="handleStopScanner"
+    >
+      <div class="text-center mb-4">
+        <h3 class="font-semibold text-slate-100 mb-1">📷 Сканирование штрихкода</h3>
+        <p class="text-sm text-slate-400">Наведите камеру на штрихкод</p>
+      </div>
+      <div class="scanner-element rounded-2xl mb-4 relative">
+        <div :id="sc.scannerElementId" class="w-full"></div>
+        <div v-if="sc.isScanning.value" class="scan-line"></div>
+        <div
+          v-if="sc.scanFlashBounds.value"
+          class="scan-flash"
+          :style="sc.scanFlashBounds.value"
+        ></div>
+        <button
+          class="torch-btn"
+          :class="{ active: sc.flashlight.value }"
+          type="button"
+          @click="sc.toggleFlashlight()"
+        >
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+          </svg>
+        </button>
+      </div>
+    </Modal>
+
+    <Modal
+      v-model="showStopItemModal"
+      title="⛔ Стоп-товар!"
+      :show-cancel="false"
+      confirm-text="OK"
+      @confirm="showStopItemModal = false"
+    >
+      <div v-if="currentStopItem" class="text-left space-y-3">
+        <div>
+          <p class="text-xs text-slate-400 mb-1">Наименование</p>
+          <p class="text-slate-100 font-medium">{{ currentStopItem.name }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-400 mb-1">Номер</p>
+          <p class="text-slate-100 font-mono">{{ currentStopItem.number }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-400 mb-1">Комментарий</p>
+          <p class="text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+            {{ currentStopItem.comment || 'Нет комментария' }}
+          </p>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">
+          Этот товар нельзя отгружать в брак. Обратитесь к руководству для уточнения.
+        </p>
+      </div>
+    </Modal>
+
+    <Modal
+      v-model="showDuplicateModal"
+      title="⚠️ Дубликат!"
+      :show-cancel="false"
+      confirm-text="OK"
+      @confirm="showDuplicateModal = false"
+    >
+      <div v-if="currentDuplicateItem" class="text-left space-y-3">
+        <div>
+          <p class="text-xs text-slate-400 mb-1">Наименование</p>
+          <p class="text-slate-100 font-medium">{{ currentDuplicateItem.name }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-400 mb-1">Номер</p>
+          <p class="text-slate-100 font-mono">{{ currentDuplicateItem.number }}</p>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">
+          Этот товар уже был добавлен в список. Повторное добавление невозможно.
+        </p>
+      </div>
+    </Modal>
+
+    <Modal
+      v-model="showRemoveModal"
+      title="Удалить товар?"
+      show-cancel
+      confirm-text="Удалить"
+      cancel-text="Отмена"
+      confirm-color="danger"
+      @confirm="confirmRemove"
+    >
+      <p v-if="removeIndex !== null" class="text-slate-400 text-center">
+        {{ separateStore.items[removeIndex]?.name }} ({{
+          separateStore.items[removeIndex]?.number
+        }})
+      </p>
+    </Modal>
+
+    <Modal
+      v-model="showFinishModal"
+      title="Завершить список?"
+      show-cancel
+      confirm-text="Завершить"
+      cancel-text="Отмена"
+      @confirm="confirmFinish"
+    >
+      <p class="text-slate-400 text-center">
+        В списке {{ separateStore.totalItems }} товаров. Будет скачан Excel файл.
+      </p>
+    </Modal>
+
+    <Modal
+      v-model="showClearModal"
+      title="Очистить список?"
+      show-cancel
+      confirm-text="Очистить"
+      cancel-text="Отмена"
+      confirm-color="danger"
+      @confirm="confirmClear"
+    >
+      <p class="text-slate-400 text-center">Все товары будут удалены</p>
+    </Modal>
+  </div>
+</template>
+
+<style scoped>
+.separate-view {
+  padding-bottom: 140px;
+}
+.scanner-element {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  min-height: 250px;
+  background: #0f172a;
+}
+.scan-line {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 300px;
+  height: 3px;
+  background: #ef4444;
+  z-index: 11;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+.scan-flash {
+  position: absolute;
+  background: rgba(34, 197, 94, 0.4);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 12;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+}
+.scan-flash--frame {
+  inset: 10%;
+  border-radius: 16px;
+}
+.torch-btn {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 20;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.torch-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.torch-btn.active {
+  background: rgba(234, 179, 8, 0.3);
+  border-color: #eab308;
+  color: #eab308;
+  box-shadow: 0 0 16px rgba(234, 179, 8, 0.4);
+}
+.items-list-detail::-webkit-scrollbar {
+  width: 6px;
+}
+.items-list-detail::-webkit-scrollbar-track {
+  background: #1e293b;
+  border-radius: 3px;
+}
+.items-list-detail::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+</style>
