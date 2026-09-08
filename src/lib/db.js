@@ -490,6 +490,51 @@ export const dbStore = {
     }
   },
 
+  backup: {
+    // Полный дамп всех таблиц для файла резервной копии (JSON).
+    // Строки отдаются как есть — ключи на месте, восстановление идёт bulkPut'ом 1-в-1.
+    async exportAll() {
+      try {
+        const tables = {}
+        for (const t of db.tables) {
+          tables[t.name] = await t.toArray()
+        }
+        return ok({ version: 1, exportedAt: nowIso(), tables }, null)
+      } catch (e) {
+        return err(e?.message || 'backup failed')
+      }
+    },
+    // Восстановление из дампа: валидация → атомарная замена всех таблиц в транзакции.
+    // Старые схемы (v1/v2, PK status) отвергаем — такой дамп нам создать негде.
+    async importAll(dump) {
+      const names = db.tables.map((t) => t.name)
+      if (!dump || dump.version !== 1 || !dump.tables) {
+        return err('Не похоже на файл резервной копии')
+      }
+      for (const name of names) {
+        if (!Array.isArray(dump.tables[name])) return err(`В копии нет таблицы ${name}`)
+      }
+      const boxes = dump.tables.boxes || []
+      if (boxes.some((b) => !b || typeof b.id !== 'string' || 'key' in b)) {
+        return err('Копия от старой версии приложения — восстановление невозможно')
+      }
+      try {
+        await db.transaction('rw', db.tables, async () => {
+          await Promise.all(db.tables.map((t) => t.clear()))
+          for (const t of db.tables) {
+            const rows = dump.tables[t.name] || []
+            if (rows.length > 0) await t.bulkPut(rows)
+          }
+        })
+        const restored = {}
+        for (const name of names) restored[name] = (dump.tables[name] || []).length
+        return ok({ restored }, null)
+      } catch (e) {
+        return err(e?.message || 'restore failed')
+      }
+    }
+  },
+
   pallets: {
     async getAll() {
       return ok(await db.pallets.toArray())
