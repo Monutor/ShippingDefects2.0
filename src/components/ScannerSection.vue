@@ -1,5 +1,6 @@
 <!-- eslint-disable vue/no-mutating-props -->
 <script setup>
+import { watch, nextTick } from 'vue'
 import { Button, Input } from '@/components/ui'
 
 const props = defineProps({
@@ -8,6 +9,18 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['mode-change', 'select-camera', 'tsd-submit', 'tsd-change'])
+
+// Автофокус на скрытое readonly-поле в ТД-режиме: DataWedge HID доставляет
+// штрихкод только в сфокусированное поле. Переключение на «Камера» снимает
+// фокус, чтобы пиканье не уходило в фон.
+watch(
+  () => props.scanner.scanMode.value,
+  (mode) => {
+    if (mode === 'tsd') nextTick(() => props.scanner.focusTsdCapture())
+    else props.scanner.blurTsdCapture()
+  },
+  { immediate: true }
+)
 
 function handleModeChange(mode) {
   emit('mode-change', mode)
@@ -56,6 +69,21 @@ async function submitTsd() {
 
     <!-- TSD input -->
     <div v-if="scanner.scanMode.value === 'tsd'" class="space-y-3 mt-4">
+      <!-- Скрытое readonly-поле для HID-пикания ТСД (DataWedge). Не занимает
+           место и не ловит тапы, но принимает штрихкод в сфокусированном виде. -->
+      <input
+        id="tsd-capture-input"
+        :value="scanner.tsdCapture.value"
+        type="text"
+        readonly
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        class="tsd-capture-input"
+        @input="(e) => scanner.onTsdCaptureInput(e)"
+        @keyup.enter="scanner.finishTsdCapture()"
+      />
       <div class="flex gap-2">
         <Input
           :model-value="scanner.tsdInput.value"
@@ -99,3 +127,20 @@ async function submitTsd() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.tsd-capture-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  outline: none;
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+}
+</style>

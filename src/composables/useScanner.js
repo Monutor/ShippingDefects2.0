@@ -41,6 +41,11 @@ export function useScanner(options = {}) {
   const tsdInput = ref('')
   const isProcessingTsd = ref(false)
 
+  // Буфер скрытого readonly-поля для HID-пикания ТСД (DataWedge). Символы
+  // поступают автоматически, без ввода пальцем и закрытия клавиатуры.
+  const tsdCapture = ref('')
+  let tsdCaptureTimer = null
+
   async function startScanner() {
     if (isScanning.value) return
 
@@ -132,6 +137,38 @@ export function useScanner(options = {}) {
       scanner = null
     }
     isScanning.value = false
+    if (tsdCaptureTimer) {
+      clearTimeout(tsdCaptureTimer)
+      tsdCaptureTimer = null
+    }
+  }
+
+  // Общий конвейер обработки сырого штрихкода из ТД-ввода (ручной ввод и
+  // скрытое поле для пикания). Возвращает true, если код передан в обработчик,
+  // и false — если отклонён. Проверка повреждённых кодов дублирует startScanner:
+  // Z + меньше 13 символов → «Штрихкод повреждён».
+  async function processRawBarcode(rawValue, processBarcode) {
+    const input = rawValue?.trim()
+    if (!input) return false
+
+    const upperInput = input.toUpperCase()
+    if (upperInput.startsWith('Z') && upperInput.length < 13) {
+      if (navigator.vibrate) navigator.vibrate(100)
+      window.showToast('Штрихкод повреждён, повторите')
+      return false
+    }
+
+    const { parseBarcodeToBrainNumber, ensurePrefix } = await import('@/utils/barcode')
+    const barcode = ensurePrefix(parseBarcodeToBrainNumber(input))
+
+    if (!barcode) {
+      window.showToast(`Неверный формат: ${input}`)
+      return false
+    }
+
+    const cb = processBarcode || options.onScanSuccess
+    if (cb) await cb(barcode)
+    return true
   }
 
   async function handleTsdInput(processBarcode) {
@@ -140,24 +177,56 @@ export function useScanner(options = {}) {
     if (!input) return
 
     isProcessingTsd.value = true
-
-    const { parseBarcodeToBrainNumber, ensurePrefix } = await import('@/utils/barcode')
-    const barcode = ensurePrefix(parseBarcodeToBrainNumber(input))
-
-    if (!barcode) {
-      window.showToast(`Неверный формат: ${input}`)
-      isProcessingTsd.value = false
-      tsdInput.value = ''
-      return
-    }
-
-    const cb = processBarcode || options.onScanSuccess
-    if (cb) await cb(barcode)
-
+    await processRawBarcode(input, processBarcode)
     tsdInput.value = ''
     nextTick(() => {
       isProcessingTsd.value = false
     })
+  }
+
+  // Скрытое readonly-поле: пишем символ в буфер и жём паузу ~80 мс. Так
+  // пиканье срабатывает без ввода пальцем — DataWedge HID сам доставляет код.
+  function onTsdCaptureInput(event) {
+    tsdCapture.value = event.target?.value ?? ''
+    if (tsdCaptureTimer) clearTimeout(tsdCaptureTimer)
+    tsdCaptureTimer = setTimeout(() => {
+      tsdCaptureTimer = null
+      void finishTsdCapture()
+    }, 80)
+  }
+
+  async function finishTsdCapture() {
+    const input = tsdCapture.value?.trim()
+    if (!input) return
+    // Очищаем буфер до обработки, чтобы повторное пикание не считалось дублем.
+    tsdCapture.value = ''
+    if (tsdCaptureTimer) {
+      clearTimeout(tsdCaptureTimer)
+      tsdCaptureTimer = null
+    }
+    await processRawBarcode(input, options.onScanSuccess)
+  }
+
+  function focusTsdCapture() {
+    const el = document.getElementById('tsd-capture-input')
+    if (el) {
+      try {
+        el.focus()
+      } catch {
+        // Мобильные браузеры иногда блокируют программный фокус без жеста.
+      }
+    }
+  }
+
+  function blurTsdCapture() {
+    const el = document.getElementById('tsd-capture-input')
+    if (el) {
+      try {
+        el.blur()
+      } catch {
+        // Мобильные браузеры иногда блокируют blur без жеста.
+      }
+    }
   }
 
   return {
@@ -168,8 +237,14 @@ export function useScanner(options = {}) {
     cleanupScanner,
     scanMode,
     tsdInput,
+    tsdCapture,
     isProcessingTsd,
     handleTsdInput,
+    processRawBarcode,
+    onTsdCaptureInput,
+    finishTsdCapture,
+    focusTsdCapture,
+    blurTsdCapture,
     flashlight,
     torchSupported,
     scanFlashBounds,

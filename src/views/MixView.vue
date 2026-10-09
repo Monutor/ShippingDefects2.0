@@ -125,12 +125,8 @@ async function finishBox() {
 async function confirmFinish() {
   showFinishModal.value = false
   const finishedBox = await boxesStore.finishCurrentBox()
-  console.warn('[FINISH.DIAG] confirmFinish result', {
-    hasBox: !!finishedBox,
-    syncError: boxesStore.syncError
-  })
   if (finishedBox) {
-    window.showToast(`✅ Микс ${finishedBox.name} завершён. Пломба: ${finishedBox.seal}`)
+    window.showToast(`✅ Микс ${finishedBox.name} завершён`)
     try {
       const { exportBoxToExcel } = await import('@/utils/excel')
       const result = await exportBoxToExcel(finishedBox)

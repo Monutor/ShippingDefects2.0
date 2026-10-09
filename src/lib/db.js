@@ -184,33 +184,51 @@ function generateId() {
 // удаляет счётчики, и нумерация начинается заново с 1. При первом вызове
 // инициализируется как max(существующие)+1, поэтому корректно подхватывает
 // и старые базы, и данные после ensureDbReady-импорта.
+// Вся операция идёт в одной rw-транзакции по settings+таблице: без неё
+// два параллельных вызова (две вкладки / два быстрых создания) успевали
+// прочитать одно и то же значение и выдать одинаковый номер.
 async function nextCounter(key, table, numberField) {
-  const stored = await db.settings.get(key)
-  let next = stored?.value
-  if (typeof next !== 'number' || !Number.isFinite(next) || next < 1) {
-    const all = await table.toArray()
-    const max = all.reduce((m, r) => Math.max(m, Number(r[numberField]) || 0), 0)
-    next = max + 1
-  }
-  await db.settings.put({ key, value: next + 1 })
-  return next
+  return db.transaction('rw', db.settings, table, async () => {
+    const stored = await db.settings.get(key)
+    let next = stored?.value
+    if (typeof next !== 'number' || !Number.isFinite(next) || next < 1) {
+      const all = await table.toArray()
+      const max = all.reduce((m, r) => Math.max(m, Number(r[numberField]) || 0), 0)
+      next = max + 1
+    }
+    await db.settings.put({ key, value: next + 1 })
+    return next
+  })
 }
 
 export const dbStore = {
   // Полная очистка локальных данных (кэш/очереди IndexedDB).
   // Счётчики номеров коробов/паллет сбрасываются: после полного сброса
   // нумерация начинается заново с 1.
+  // Одна транзакция на все таблицы: при сбое посередине база не остаётся
+  // наполовину очищенной (часть таблиц пуста, часть со старыми данными).
   async resetLocalData() {
-    await Promise.all([
-      db.brain_items.clear(),
-      db.boxes.clear(),
-      db.box_items.clear(),
-      db.separate_items.clear(),
-      db.scan_history.clear(),
-      db.pallets.clear(),
-      db.pallet_items.clear(),
-      db.settings.bulkDelete(['box_counter', 'pallet_counter'])
-    ])
+    await db.transaction(
+      'rw',
+      db.brain_items,
+      db.boxes,
+      db.box_items,
+      db.separate_items,
+      db.scan_history,
+      db.pallets,
+      db.pallet_items,
+      db.settings,
+      async () => {
+        await db.brain_items.clear()
+        await db.boxes.clear()
+        await db.box_items.clear()
+        await db.separate_items.clear()
+        await db.scan_history.clear()
+        await db.pallets.clear()
+        await db.pallet_items.clear()
+        await db.settings.bulkDelete(['box_counter', 'pallet_counter'])
+      }
+    )
     return ok(null, null)
   },
   brainItems: {
@@ -275,8 +293,10 @@ export const dbStore = {
     },
     async update(boxId, payload = {}) {
       try {
-        const all = await db.boxes.toArray()
-        const existing = all.find((r) => r.id === boxId) || null
+        // Первичный ключ — id, поэтому берём строку точечным get(), а не
+        // полным toArray() + find(): вызывается на каждый скан, а выборка
+        // всей таблицы давала O(n) на каждый товар.
+        const existing = (await db.boxes.get(boxId)) || null
         if (!existing) return err('Not found')
         if (payload.item && typeof payload.item === 'object' && payload.item.barcode) {
           try {
@@ -315,7 +335,12 @@ export const dbStore = {
         }
         // v3: primary key таблицы — id, поэтому обновление делаем через put() по ключу.
         // Старый костыль delete+add с ручным key больше не нужен (он был для битого primary status).
+        // Дату завершения проставляем при первом переходе в finished — как в pallets.update,
+        // иначе у завершённых миксов не было времени закрытия (BoxesView показывал Invalid Date).
         const updated = { ...existing, ...payload, updated_at: nowIso() }
+        if (payload.status === 'finished' && !existing.finished_at) {
+          updated.finished_at = nowIso()
+        }
         await db.boxes.put(updated)
         return ok(updated, null)
       } catch (e) {
@@ -420,6 +445,7 @@ export const dbStore = {
           brand: r.brain_brand || r.brand,
           comment: r.comment,
           is_stop_item: r.is_stop_item,
+          finished_at: r.finished_at || null,
           created_at: r.created_at
         }))
       )
@@ -450,6 +476,19 @@ export const dbStore = {
     },
     async clearAll() {
       await db.separate_items.clear()
+      return ok(null, null)
+    },
+    // Помечает все активные товары (без finished_at) как завершённые.
+    // Товар не удаляется — остаётся в таблице, чтобы общая база показывала
+    // его место «Отд В». Аналог status:'finished' у коробок в box_items.
+    async finishActive() {
+      const rows = await db.separate_items.toArray()
+      const now = nowIso()
+      for (const r of rows) {
+        if (!r.finished_at) {
+          await db.separate_items.update(r.id, { finished_at: now })
+        }
+      }
       return ok(null, null)
     }
   },
@@ -564,8 +603,9 @@ export const dbStore = {
     },
     async update(palletId, payload = {}) {
       try {
-        const all = await db.pallets.toArray()
-        const existing = all.find((r) => r.id === palletId) || null
+        // Точечный get() по первичному ключу вместо toArray() + find():
+        // update дёргается на каждое действие с паллетой.
+        const existing = (await db.pallets.get(palletId)) || null
         if (!existing) return err('Not found')
         // v3: primary key таблицы — id, поэтому обновление делаем через put() по ключу.
         const updated = { ...existing, ...payload, updated_at: nowIso() }

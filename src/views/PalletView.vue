@@ -294,7 +294,7 @@ async function confirmFinish() {
   showFinishModal.value = false
   const finishedPallet = await palletStore.finishCurrentPallet()
   if (finishedPallet) {
-    window.showToast(`✅ Паллет ${finishedPallet.name} завершён. Пломба: ${finishedPallet.seal}`)
+    window.showToast(`✅ Паллет ${finishedPallet.name} завершён`)
     try {
       const { exportPalletToExcel } = await import('@/utils/excel')
       const result = await exportPalletToExcel(finishedPallet)

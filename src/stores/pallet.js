@@ -111,7 +111,6 @@ export const usePalletStore = defineStore('pallet', () => {
     finishCurrentPallet: sync.finishCurrentPallet,
     undoLastAction: sync.undoLastAction,
     clearAllPallets: sync.clearAllPallets,
-    clearAllPalletsFromBackend: sync.clearAllPalletsFromBackend,
     getAllPalletItems: sync.getAllPalletItems
   }
 })

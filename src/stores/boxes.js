@@ -249,6 +249,21 @@ export const useBoxesStore = defineStore(
       }
     }
 
+    /**
+     * Откат оптимистичного добавления: убирает товар из текущего короба и из
+     * истории undo. Ищет строго по номеру, а не по позиции: pop() сносил бы
+     * последний элемент списка, а это не тот, который только что добавили,
+     * если за время await успеет произойти что-то ещё.
+     */
+    function rollbackAddedItem(number) {
+      const itemIdx = currentBox.value?.items?.findIndex((i) => i.number === number) ?? -1
+      if (itemIdx !== -1) currentBox.value.items.splice(itemIdx, 1)
+      const histIdx = actionHistory.value.findIndex(
+        (a) => a.type === 'add_item' && a.item.number === number
+      )
+      if (histIdx !== -1) actionHistory.value.splice(histIdx, 1)
+    }
+
     /** Добавление товара в текущий короб */
     async function addItemToCurrentBox(item) {
       if (!currentBox.value) {
@@ -303,19 +318,13 @@ export const useBoxesStore = defineStore(
       const newItems = [...currentBox.value.items, newItem]
       currentBox.value = { ...currentBox.value, items: newItems }
 
-      // Логирование сканирования (пакетная отправка)
-      logScan({
-        barcode: item.number,
-        itemNumber: item.number,
-        itemName: item.name,
-        action: 'added',
-        boxId: currentBox.value.id.toString()
-      })
+      const boxIdForScan = currentBox.value.id.toString()
+      const backendId = currentBox.value.backendId
 
       // Синхронизация добавления в короб (прямой PUT)
-      if (currentBox.value.backendId) {
+      if (backendId) {
         try {
-          const result = await db.boxes.update(currentBox.value.backendId, {
+          const result = await db.boxes.update(backendId, {
             item: {
               barcode: item.number,
               name: item.name,
@@ -325,13 +334,7 @@ export const useBoxesStore = defineStore(
           })
 
           if (result.error) {
-            // Удаляем добавленный item по номеру, а не pop() — предотвращаем удаление не того элемента
-            const itemIdx = currentBox.value.items.findIndex((i) => i.number === item.number)
-            if (itemIdx !== -1) currentBox.value.items.splice(itemIdx, 1)
-            const histIdx = actionHistory.value.findIndex(
-              (a) => a.type === 'add_item' && a.item.number === item.number
-            )
-            if (histIdx !== -1) actionHistory.value.splice(histIdx, 1)
+            rollbackAddedItem(item.number)
 
             // Проверяем на дубликат
             if (/duplicate/i.test(result.error.message || '') || result.error.code === 409) {
@@ -344,12 +347,25 @@ export const useBoxesStore = defineStore(
             return { success: false }
           }
         } catch (error) {
-          currentBox.value.items.pop()
-          actionHistory.value.pop()
+          rollbackAddedItem(item.number)
           syncError.value = `Не синхронизировано: ${error.message}`
           showError(error.message, 'Не удалось сохранить товар')
+          // Раньше здесь не было return: после отката функция всё равно отдавала
+          // { success: true }, и UI показывал «Товар добавлен» для несохранённого.
+          return { success: false }
         }
       }
+
+      // Логирование сканирования (пакетная отправка) — только после успешной записи
+      // в IndexedDB. Раньше logScan шёл до неё, и отклонённые дубликаты оставляли
+      // в scan_history фантомные строки с action:'added' без единого товара.
+      logScan({
+        barcode: item.number,
+        itemNumber: item.number,
+        itemName: item.name,
+        action: 'added',
+        boxId: boxIdForScan
+      })
 
       return { success: true }
     }
@@ -387,6 +403,29 @@ export const useBoxesStore = defineStore(
         }
       }
 
+      // DB-фолбэк по миксам (включая завершённые и не загруженные в память).
+      // In-memory стор выше держит только активные контейнеры, поэтому товар из
+      // закрытого микса проходил как новый, и дубль ловился лишь постфактум —
+      // ConstraintError по индексу &barcode, с общим сообщением вместо
+      // «уже в миксе №N». Именно этот фолбэк есть в separate.js и pallet/sync.js.
+      try {
+        const foundBox = await db.boxItems.findByBarcode([...searchNumbers])
+        // Если код лежит в текущем миксе — это не глобальный дубль: его точнее
+        // отловит проверка duplicateInCurrent в addItemToCurrentBox.
+        if (
+          foundBox?.data?.box_number != null &&
+          foundBox.data.boxId !== currentBox.value?.backendId
+        ) {
+          return {
+            boxNumber: foundBox.data.box_number,
+            boxName: foundBox.data.box_name,
+            type: 'box'
+          }
+        }
+      } catch {
+        // ignore — in-memory проверка выше уже отработала
+      }
+
       // DB-фолбэк: inline-товары в паллетах (включая завершённые) — стор коробов их
       // не видит, а уникального индекса по barcode у pallet_items нет. Без этого
       // товар из паллеты можно повторно добавить в микс (дубль).
@@ -415,13 +454,6 @@ export const useBoxesStore = defineStore(
       syncError.value = null
 
       const originalCurrentBox = JSON.parse(JSON.stringify(currentBox.value))
-      console.warn('[FINISH.DIAG] start', {
-        id: originalCurrentBox.id,
-        backendId: originalCurrentBox.backendId,
-        status: originalCurrentBox.status,
-        items: originalCurrentBox.items.length,
-        hasItems: !!originalCurrentBox.items?.length
-      })
 
       try {
         const backendId = originalCurrentBox.backendId
@@ -429,11 +461,6 @@ export const useBoxesStore = defineStore(
         // Завершаем короб (PUT status=finished) и получаем items
         if (backendId) {
           const updateResult = await db.boxes.update(backendId, { status: 'finished' })
-          console.warn('[FINISH.DIAG] after db.boxes.update', {
-            ok: !!updateResult.data,
-            error: updateResult.error ? updateResult.error.message : null
-          })
-
           if (updateResult.error) throw new Error(updateResult.error.message)
 
           // Читаем items из IndexedDB для экспорта
@@ -485,11 +512,6 @@ export const useBoxesStore = defineStore(
           return originalCurrentBox
         }
       } catch (error) {
-        console.error('[FINISH.DIAG] CAUGHT', {
-          message: error.message,
-          stack: error.stack,
-          name: error.name
-        })
         syncError.value = `Не удалось завершить короб: ${error.message}`
 
         // Обработка ошибки «создан» — восстанавливаем состояние через showError
@@ -639,12 +661,6 @@ export const useBoxesStore = defineStore(
       )
     }
 
-    /** Очистка завершённых коробов — только finished (не active!) */
-    function clearAllBoxesFromBackend() {
-      boxes.value = boxes.value.filter((b) => b.status === 'active')
-      window.showToast('🗑 Короба удалены в локальном хранилище')
-    }
-
     return {
       boxes,
       currentBox,
@@ -667,7 +683,6 @@ export const useBoxesStore = defineStore(
       getAllBoxItems,
       deleteBox,
       clearAllBoxes,
-      clearAllBoxesFromBackend,
       loadActiveBox,
       loadAllActiveBoxes,
       loadBoxes,

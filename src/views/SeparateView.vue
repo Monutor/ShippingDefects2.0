@@ -138,6 +138,9 @@ watch(sc.scanMode, (newMode, oldMode) => {
   localStorage.setItem('separateScanMode', newMode)
   stopScanner()
   window.showToast(`Режим: ${newMode === 'tsd' ? 'ТСД' : 'Камера'}`)
+  // Автофокус на скрытое readonly-поле для HID-пикания (DataWedge).
+  if (newMode === 'tsd') nextTick(() => sc.focusTsdCapture())
+  else sc.blurTsdCapture()
   if (newMode === 'camera') sc.fetchCameras()
 })
 
@@ -145,6 +148,9 @@ onMounted(async () => {
   initSounds()
   const savedMode = localStorage.getItem('separateScanMode')
   if (savedMode === 'tsd' || savedMode === 'camera') sc.scanMode.value = savedMode
+
+  // Если стартовали в ТД-режиме — сразу фокусируем скрытое поле для пикания.
+  if (sc.scanMode.value === 'tsd') nextTick(() => sc.focusTsdCapture())
 
   isLoading.value = true
   try {
@@ -194,7 +200,10 @@ async function confirmFinish() {
   const exportResult = await exportSeparateToExcel(separateStore.items)
   if (exportResult.success) {
     window.showToast(`Файл скачан: ${exportResult.filename}`)
-    separateStore.clearAll()
+    // Товары не удаляем — помечаем завершёнными, чтобы общая база показывала
+    // их место «Отд В». Перезагружаем список: finished-товары отфильтруются.
+    await separateStore.finishActive()
+    await separateStore.loadSeparateItems()
   } else {
     window.showToast('Ошибка экспорта: ' + exportResult.error)
   }
@@ -252,6 +261,20 @@ async function confirmClear() {
       </div>
 
       <div v-if="sc.scanMode.value === 'tsd'" class="tsd-input-wrapper mb-4">
+        <!-- Скрытое readonly-поле для HID-пикания ТСД (DataWedge). -->
+        <input
+          id="tsd-capture-input"
+          :value="sc.tsdCapture.value"
+          type="text"
+          readonly
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+          class="tsd-capture-input"
+          @input="(e) => sc.onTsdCaptureInput(e)"
+          @keyup.enter="sc.finishTsdCapture()"
+        />
         <div class="flex items-center gap-2">
           <Input
             v-model="sc.tsdInput.value"
@@ -569,6 +592,20 @@ async function confirmClear() {
 </template>
 
 <style scoped>
+.tsd-capture-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  outline: none;
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+}
 .separate-view {
   padding-bottom: 140px;
 }

@@ -227,14 +227,6 @@ export function usePalletSync(context) {
     }
   }
 
-  function clearAllPalletsFromBackend() {
-    pallets.value = []
-    currentPallet.value = null
-    context.availableBoxes.value = []
-    context.availableSeparateItems.value = []
-    window.showToast('🗑 Паллеты удалены, данные очищены')
-  }
-
   function getAllPalletItems() {
     const result = []
     for (const pallet of pallets.value) {
@@ -261,7 +253,6 @@ export function usePalletSync(context) {
     finishCurrentPallet,
     undoLastAction,
     clearAllPallets,
-    clearAllPalletsFromBackend,
     getAllPalletItems
   }
 }

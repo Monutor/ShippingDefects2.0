@@ -4,7 +4,7 @@ import { parseBarcodeToBrainNumber } from '@/utils/barcode'
 /**
  * Общий индекс мест хранения товаров.
  * byBarcode: штрихкод (сырой и нормализованный) → {
- *   label, // «М3», «П1», «М3 → П1», «Отд»
+ *   label, // «М3», «П1», «М3 → П1», «В»
  *   kind, // 'box' | 'pallet-inline' | 'separate'
  *   boxId, boxNumber, palletId, palletNumber
  * }
@@ -70,7 +70,7 @@ export async function buildLocationIndex() {
   for (const i of sepRes.data || []) {
     if (i.barcode) {
       set(i.barcode, {
-        label: 'Отд',
+        label: 'В',
         kind: 'separate',
         boxId: null,
         boxNumber: null,

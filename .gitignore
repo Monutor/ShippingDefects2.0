@@ -37,6 +37,7 @@ docs
 # Opencode
 .opencode/
 .zvec-grep
+brak
 
 # Playwright MCP (локальное состояние браузера)
 .playwright-mcp/

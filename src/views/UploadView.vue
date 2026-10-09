@@ -14,6 +14,22 @@ const filteredItems = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
   if (!query) return brainStore.items
 
+  // Режим поиска по месту: «М6», «П12» или ровно «В».
+  const isPlaceQuery = /^[мп]\d+$/i.test(query) || query === 'в'
+  if (isPlaceQuery) {
+    return brainStore.items.filter((item) => {
+      const label = itemLocation(item).toLowerCase()
+      // «—» = места нет, такой товар не подходит.
+      if (label === '—') return false
+      // Ярлык бывает составным («М6 → П1»), сверяем каждый сегмент:
+      // точное совпадение или начало с пробелом (чтобы «М6» не ловил «М16»).
+      return label.split('→').some((seg) => {
+        seg = seg.trim().toLowerCase()
+        return seg === query || seg.startsWith(query + ' ')
+      })
+    })
+  }
+
   return brainStore.items.filter((item) => {
     const number = String(item.number || '').toLowerCase()
     const name = String(item.name || '').toLowerCase()
@@ -210,7 +226,7 @@ watch(
             <input
               v-model="searchQuery"
               type="text"
-              placeholder="Поиск по номеру, наименованию, коду или комментарию"
+              placeholder="Поиск по номеру, названию или месту (М6, П12, В)"
               class="flex-1 bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-2.5 outline-none text-slate-100 placeholder-slate-400 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all"
             />
             <button

@@ -39,8 +39,11 @@ export const useSeparateStore = defineStore('separate', () => {
       const result = await db.separateItems.getAll()
       if (result.error) return []
 
-      // id теперь строковый UUID — сортируем по created_at (новые сверху)
-      const sorted = (result.data || []).sort((a, b) =>
+      // id теперь строковый UUID — сортируем по created_at (новые сверху).
+      // Завершённые товары (finished_at != null) не показываем в активном
+      // списке: они остаются в БД, чтобы общая база показывала их место «Отд В».
+      const active = (result.data || []).filter((i) => i.finished_at == null)
+      const sorted = active.sort((a, b) =>
         String(b.created_at || '').localeCompare(String(a.created_at || ''))
       )
 
@@ -145,7 +148,12 @@ export const useSeparateStore = defineStore('separate', () => {
         brand: itemCopy.article || '',
         model: '',
         defect_type: '',
-        comment: itemCopy.comment || ''
+        comment: itemCopy.comment || '',
+        // Признак стоп-товара пишем в БД: колонка есть в схеме separate_items
+        // и читается при загрузке, но раньше сюда флаг не попадал вовсе.
+        // Сейчас он всегда false — SeparateView не даёт добавить стоп-товар
+        // (модалка без кнопки «всё равно добавить»).
+        is_stop_item: itemCopy.is_stop_item === true
       })
 
       if (result.error) throw new Error(result.error.message)
@@ -282,6 +290,11 @@ export const useSeparateStore = defineStore('separate', () => {
     )
   }
 
+  /** Пометить все товары как завершённые (остаются в БД для отображения места) */
+  async function finishActive() {
+    return db.separateItems.finishActive()
+  }
+
   return {
     items,
     actionHistory,
@@ -295,6 +308,7 @@ export const useSeparateStore = defineStore('separate', () => {
     undoLastAction,
     isDuplicate,
     clearAll,
+    finishActive,
     loadSeparateItems
   }
 })

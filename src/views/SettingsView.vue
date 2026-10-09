@@ -28,7 +28,15 @@ async function downloadBackup() {
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `backup_${new Date().toISOString().slice(0, 10)}.json`
+    // Метка с датой и временем: прежнее имя вида backup_ГГГГ-ММ-ДД.json
+    // совпадало при повторном скачивании в тот же день, и браузер молча
+    // дописывал «(1)» — найти нужную копию было невозможно.
+    const d = new Date()
+    const pad = (n) => String(n).padStart(2, '0')
+    const stamp =
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+      `_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`
+    link.download = `backup_${stamp}.json`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)

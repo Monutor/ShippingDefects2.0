@@ -46,19 +46,10 @@ export function parseBarcodeToBrainNumber(barcode) {
     return `${cleaned.slice(1, 4)}/${cleaned.slice(6, 11)}`
   }
 
-  if (len === 11) {
-    return `${cleaned.slice(1, 4)}/${cleaned.slice(6, 10)}`
-  }
-
-  if (len === 10) {
-    return `${cleaned.slice(1, 4)}/${cleaned.slice(6, 11)}`
-  }
-
-  // 13 цифр — EAN-13
-  if (len === 13) {
-    return `187/${cleaned}`
-  }
-
+  // Длины 10/11/13 однозначно не ложатся на формат 187/NNNNN: прежние ветки
+  // возвращали мусор вида «870/5328» или «187/<13 цифр», guard «Неверный формат»
+  // не срабатывал и в контейнер записывался фантомный товар с невалидным номером.
+  // Лучше отклонить код, чем принять неверный номер.
   return null
 }
 
