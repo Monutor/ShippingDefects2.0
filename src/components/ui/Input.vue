@@ -12,7 +12,7 @@ const props = defineProps({
   icon: [Boolean, String] // Поддерживаем и boolean, и строку (название иконки)
 })
 
-const emit = defineEmits(['update:modelValue', 'keyup', 'change', 'blur', 'click'])
+const emit = defineEmits(['update:modelValue', 'keyup', 'change', 'blur', 'click', 'focus'])
 
 const inputValue = computed({
   get: () => props.modelValue,
@@ -62,6 +62,7 @@ const inputRef = ref(null)
         @keyup="$emit('keyup', $event)"
         @change="$emit('change', $event)"
         @blur="$emit('blur', $event)"
+        @focus="$emit('focus', $event)"
         @click="$emit('click', $event)"
       />
       <svg

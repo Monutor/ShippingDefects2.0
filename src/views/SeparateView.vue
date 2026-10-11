@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
 import { useBrainStore } from '@/stores/brain'
 import { useSeparateStore } from '@/stores/separate'
 import { useScanner } from '@/composables/useScanner'
@@ -21,6 +21,24 @@ const isLoading = ref(false)
 
 // SeparateView использует inline-сканер (не модалку) — showScanner управляет видимостью элемента
 const showScanner = ref(false)
+
+const groupedItems = computed(() => {
+  const groups = { '': [], ТВ: [], КБТ: [] }
+  separateStore.items.forEach((item) => {
+    const brainItem = brainStore.findByBarcode(item.number)
+    const group = (brainItem?.groupShipment || '').trim()
+    if (group === 'ТВ' || group === 'КБТ') {
+      groups[group].push(item)
+    } else {
+      groups[''].push(item)
+    }
+  })
+  return groups
+})
+
+function getItemIndexByNumber(number) {
+  return separateStore.items.findIndex((i) => i.number === number)
+}
 
 function handleKeyDown(event) {
   if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
@@ -115,6 +133,37 @@ const sc = useScanner({
   elementId: 'barcode-scanner',
   onScanSuccess: handleScanResult
 })
+
+const showSuggestions = ref(false)
+const query = computed(() => (sc.tsdInput.value || '').trim().toLowerCase())
+
+watch(query, (q) => {
+  if (q) showSuggestions.value = true
+})
+const suggestions = computed(() => {
+  if (!query.value) return []
+  const q = query.value
+  return brainStore.items
+    .filter((item) => {
+      const num = (item.number || '').toLowerCase()
+      const name = (item.name || '').toLowerCase()
+      const art = (item.article || '').toLowerCase()
+      return num.includes(q) || name.includes(q) || art.includes(q)
+    })
+    .slice(0, 20)
+})
+
+function selectSuggestion(item) {
+  sc.tsdInput.value = item.number
+  showSuggestions.value = false
+  window.setTimeout(() => sc.handleTsdInput(handleScanResult), 0)
+}
+
+function hideSuggestions() {
+  window.setTimeout(() => {
+    showSuggestions.value = false
+  }, 200)
+}
 
 // SeparateView: камера inline — startScanner показывает элемент и запускает камеру
 async function startScanner() {
@@ -276,17 +325,48 @@ async function confirmClear() {
           @keyup.enter="sc.finishTsdCapture()"
         />
         <div class="flex items-center gap-2">
-          <Input
-            v-model="sc.tsdInput.value"
-            placeholder="Сканируйте или введите номер"
-            icon="scan"
-            clearable
-            class="flex-1"
-            @keyup.enter="sc.handleTsdInput(handleScanResult)"
-            @change="sc.handleTsdInput(handleScanResult)"
-            @blur="sc.handleTsdInput(handleScanResult)"
-          />
-          <Button size="md" @click="sc.handleTsdInput(handleScanResult)">Добавить</Button>
+          <div class="relative flex-1">
+            <Input
+              :model-value="sc.tsdInput.value"
+              placeholder="Сканируйте или введите номер"
+              icon="scan"
+              clearable
+              class="flex-1"
+              @update:model-value="
+                (val) => {
+                  sc.tsdInput.value = val
+                  if (val) showSuggestions = true
+                }
+              "
+              @keyup.enter="sc.handleTsdInput(handleScanResult)"
+              @blur="hideSuggestions"
+              @focus="showSuggestions = true"
+            />
+            <div
+              v-if="showSuggestions && suggestions.length > 0"
+              class="absolute z-50 mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl shadow-lg max-h-64 overflow-y-auto"
+            >
+              <button
+                v-for="item in suggestions"
+                :key="item.number"
+                type="button"
+                class="w-full text-left px-3 py-2 hover:bg-slate-700 flex items-center gap-2"
+                @mousedown.prevent="selectSuggestion(item)"
+              >
+                <span class="text-xs font-mono text-slate-400">{{ item.number }}</span>
+                <span class="text-sm text-slate-100 truncate">{{ item.name }}</span>
+                <span v-if="item.article" class="text-xs text-slate-500 ml-auto">{{
+                  item.article
+                }}</span>
+              </button>
+            </div>
+          </div>
+          <Button
+            size="md"
+            :disabled="!sc.tsdInput.value"
+            @click="sc.handleTsdInput(handleScanResult)"
+            >Добавить</Button
+          >
         </div>
         <p class="text-xs text-slate-500 mt-2 ml-2">
           💡 Введите номер товара (например 45328) — префикс добавится автоматически
@@ -376,56 +456,70 @@ async function confirmClear() {
               </div>
               <p class="text-slate-400 text-sm">Пока нет товаров. Отсканируйте штрихкод.</p>
             </div>
-            <div v-else class="items-list-detail space-y-2 max-h-96 overflow-y-auto scrollbar-thin">
-              <div
-                v-for="(item, index) in separateStore.items"
-                :key="index"
-                class="item-row p-3 rounded-xl transition-all duration-200"
-                :class="
-                  separateStore.lastScannedItem?.number === item.number
-                    ? 'bg-amber-500/20 border-2 border-amber-500'
-                    : 'bg-slate-700/50 hover:bg-slate-700'
-                "
-              >
-                <div class="flex items-center gap-3">
-                  <div
-                    class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-md"
-                  >
-                    <span class="text-xs font-bold text-white">{{
-                      String(index + 1).padStart(3, '0')
-                    }}</span>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-0.5">
-                      <span
-                        class="text-xs font-semibold text-primary-400 bg-primary-500/20 px-2 py-0.5 rounded-md border border-primary-500/30"
-                        >{{ item.article }}</span
-                      >
-                      <van-icon
-                        v-if="separateStore.lastScannedItem?.number === item.number"
-                        name="star"
-                        size="14"
-                        color="#fbbf24"
-                        class="mr-1"
-                        aria-hidden="true"
-                      />
+            <div
+              v-else
+              class="items-list-detail space-y-4 max-h-96 overflow-y-auto overflow-x-hidden scrollbar-thin"
+            >
+              <template v-for="groupKey in ['', 'ТВ', 'КБТ']" :key="groupKey">
+                <div v-if="groupedItems[groupKey].length > 0">
+                  <h4 class="text-xs uppercase tracking-wide text-slate-400 mb-2 px-1">
+                    {{ groupKey === '' ? 'Без группы' : `Группа ${groupKey}` }} ({{
+                      groupedItems[groupKey].length
+                    }})
+                  </h4>
+                  <div class="space-y-2">
+                    <div
+                      v-for="(item, idx) in groupedItems[groupKey]"
+                      :key="item.number"
+                      class="item-row p-3 rounded-xl transition-all duration-200"
+                      :class="
+                        separateStore.lastScannedItem?.number === item.number
+                          ? 'bg-amber-500/20 border-2 border-amber-500'
+                          : 'bg-slate-700/50 hover:bg-slate-700'
+                      "
+                    >
+                      <div class="flex items-center gap-3">
+                        <div
+                          class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-md"
+                        >
+                          <span class="text-xs font-bold text-white">{{
+                            String(idx + 1).padStart(3, '0')
+                          }}</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center gap-2 mb-0.5">
+                            <span
+                              class="text-xs font-semibold text-primary-400 bg-primary-500/20 px-2 py-0.5 rounded-md border border-primary-500/30"
+                              >{{ item.article }}</span
+                            >
+                            <van-icon
+                              v-if="separateStore.lastScannedItem?.number === item.number"
+                              name="star"
+                              size="14"
+                              color="#fbbf24"
+                              class="mr-1"
+                              aria-hidden="true"
+                            />
+                          </div>
+                          <p class="text-sm font-medium text-slate-100 truncate">{{ item.name }}</p>
+                        </div>
+                        <div class="flex items-center gap-3 flex-shrink-0">
+                          <span class="text-xs font-mono text-slate-500">{{ item.number }}</span>
+                          <van-icon
+                            name="delete-o"
+                            size="20"
+                            color="#f87171"
+                            role="button"
+                            aria-label="Удалить товар"
+                            class="cursor-pointer hover:scale-110 transition-transform"
+                            @click="requestRemoveItem(getItemIndexByNumber(item.number))"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <p class="text-sm font-medium text-slate-100 truncate">{{ item.name }}</p>
-                  </div>
-                  <div class="flex items-center gap-3 flex-shrink-0">
-                    <span class="text-xs font-mono text-slate-500">{{ item.number }}</span>
-                    <van-icon
-                      name="delete-o"
-                      size="20"
-                      color="#f87171"
-                      role="button"
-                      aria-label="Удалить товар"
-                      class="cursor-pointer hover:scale-110 transition-transform"
-                      @click="requestRemoveItem(index)"
-                    />
                   </div>
                 </div>
-              </div>
+              </template>
             </div>
           </div>
         </div>
@@ -667,6 +761,9 @@ async function confirmClear() {
   border-color: #eab308;
   color: #eab308;
   box-shadow: 0 0 16px rgba(234, 179, 8, 0.4);
+}
+.items-list-detail {
+  overflow-x: hidden;
 }
 .items-list-detail::-webkit-scrollbar {
   width: 6px;

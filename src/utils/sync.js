@@ -153,7 +153,9 @@ export async function syncBrainItems(items) {
       brand: item.article || '',
       model: '',
       defect_type: '',
-      comment: item.comment || ''
+      comment: item.comment || '',
+      groupShipment: item.groupShipment || '',
+      section: item.section || ''
     }))
 
     await db.brainItems.import({ rows })
@@ -171,7 +173,9 @@ export async function loadBrainItemsFromBackend() {
       number: item.barcode,
       name: decodeMojibake((item.name || '').trim()) || 'Без названия', // Fallback на "Без названия" если пусто + mojibake fix
       article: decodeMojibake(item.brand || ''),
-      comment: decodeMojibake(item.comment || '')
+      comment: decodeMojibake(item.comment || ''),
+      groupShipment: decodeMojibake(item.groupShipment || ''),
+      section: decodeMojibake(item.section || '')
     }))
   } catch {
     return null

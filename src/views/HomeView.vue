@@ -86,6 +86,13 @@ function autoMapColumns(headers) {
   const commentKeywords = ['комментарий', 'comment', 'примечание', 'note', 'замечание']
   const commentIndex = lowerHeaders.findIndex((h) => commentKeywords.some((kw) => h.includes(kw)))
 
+  const groupShipmentIndex = lowerHeaders.findIndex((h) =>
+    ['группа отгрузки', 'группа', 'shipment group'].some((kw) => h.includes(kw))
+  )
+  const sectionIndex = lowerHeaders.findIndex((h) =>
+    ['секция', 'section', 'зона'].some((kw) => h.includes(kw))
+  )
+
   return {
     barcode: '',
     // L5: name fallback на headers[4] || headers[0] — работает для стандартных Excel файлов.
@@ -93,7 +100,9 @@ function autoMapColumns(headers) {
     name: nameIndex !== -1 ? headers[nameIndex] : headers[4] || headers[0],
     article: articleIndex !== -1 ? headers[articleIndex] : '',
     number: numberIndex !== -1 ? headers[numberIndex] : headers[0],
-    comment: commentIndex !== -1 ? headers[commentIndex] : ''
+    comment: commentIndex !== -1 ? headers[commentIndex] : '',
+    groupShipment: groupShipmentIndex !== -1 ? headers[groupShipmentIndex] : '',
+    section: sectionIndex !== -1 ? headers[sectionIndex] : ''
   }
 }
 </script>
@@ -126,23 +135,6 @@ function autoMapColumns(headers) {
         <p>{{ error }}</p>
       </div>
     </div>
-
-    <Modal
-      v-model="showResetModal"
-      title="Сбросить данные?"
-      show-cancel
-      confirm-text="Сбросить"
-      cancel-text="Отмена"
-      confirm-color="danger"
-      @confirm="confirmReset"
-    >
-      <p class="text-slate-400 text-center">
-        Вы уверены? Это удалит все локальные данные: короба, паллеты, товары и историю.
-      </p>
-      <p class="text-rose-400 text-sm text-center mt-2 font-medium">
-        ⚠️ Это действие нельзя отменить.
-      </p>
-    </Modal>
 
     <p class="menu-hint">Используйте меню внизу для навигации</p>
   </div>

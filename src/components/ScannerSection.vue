@@ -1,11 +1,43 @@
 <!-- eslint-disable vue/no-mutating-props -->
 <script setup>
-import { watch, nextTick } from 'vue'
+import { watch, nextTick, computed, ref } from 'vue'
 import { Button, Input } from '@/components/ui'
+import { useBrainStore } from '@/stores/brain'
 
 const props = defineProps({
   scanner: { type: Object, required: true },
   onTsdSubmit: { type: Function, default: null }
+})
+
+const brainStore = useBrainStore()
+const showSuggestions = ref(false)
+
+const tsdInputProxy = computed({
+  get: () => props.scanner?.tsdInput?.value ?? '',
+  set: (val) => {
+    if (props.scanner?.tsdInput) props.scanner.tsdInput.value = val
+  }
+})
+
+const query = computed(() => (tsdInputProxy.value || '').trim().toLowerCase())
+
+const suggestions = computed(() => {
+  if (!query.value) return []
+  const q = query.value
+  return brainStore.items
+    .filter((item) => {
+      const num = (item.number || '').toLowerCase()
+      const name = (item.name || '').toLowerCase()
+      const art = (item.article || '').toLowerCase()
+      return num.includes(q) || name.includes(q) || art.includes(q)
+    })
+    .slice(0, 20)
+})
+
+watch(query, (q) => {
+  if (q && props.scanner.scanMode.value === 'tsd') {
+    showSuggestions.value = true
+  }
 })
 
 const emit = defineEmits(['mode-change', 'select-camera', 'tsd-submit', 'tsd-change'])
@@ -32,8 +64,23 @@ function handleSelectCamera(deviceId) {
 
 async function submitTsd() {
   const input = props.scanner.tsdInput.value?.trim()
+  if (!input) return
   if (props.onTsdSubmit) await props.onTsdSubmit(input)
   else emit('tsd-submit', input)
+  showSuggestions.value = false
+}
+
+function selectSuggestion(item) {
+  tsdInputProxy.value = item.number
+  showSuggestions.value = false
+  // небольшая задержка чтобы значение применилось
+  window.setTimeout(() => submitTsd(), 0)
+}
+
+function hideSuggestions() {
+  window.setTimeout(() => {
+    showSuggestions.value = false
+  }, 200)
 }
 </script>
 
@@ -85,16 +132,43 @@ async function submitTsd() {
         @keyup.enter="scanner.finishTsdCapture()"
       />
       <div class="flex gap-2">
-        <Input
-          :model-value="scanner.tsdInput.value"
-          placeholder="📱 Штрихкод или номер товара"
-          :disabled="scanner.isProcessingTsd.value"
-          variant="primary"
-          size="large"
-          @update:model-value="(val) => emit('tsd-change', val)"
-          @keyup.enter="submitTsd"
-        />
-        <Button size="md" :loading="scanner.isProcessingTsd.value" @click="submitTsd">
+        <div class="relative flex-1">
+          <Input
+            v-model="tsdInputProxy"
+            placeholder="📱 Штрихкод или номер товара"
+            :disabled="scanner.isProcessingTsd.value"
+            variant="primary"
+            size="large"
+            clearable
+            @keyup.enter="submitTsd"
+            @focus="showSuggestions = true"
+            @blur="hideSuggestions"
+          />
+          <div
+            v-if="showSuggestions && suggestions.length > 0"
+            class="absolute z-50 mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl shadow-lg max-h-64 overflow-y-auto"
+          >
+            <button
+              v-for="item in suggestions"
+              :key="item.number"
+              type="button"
+              class="w-full text-left px-3 py-2 hover:bg-slate-700 flex items-center gap-2"
+              @mousedown.prevent="selectSuggestion(item)"
+            >
+              <span class="text-xs font-mono text-slate-400">{{ item.number }}</span>
+              <span class="text-sm text-slate-100 truncate">{{ item.name }}</span>
+              <span v-if="item.article" class="text-xs text-slate-500 ml-auto">{{
+                item.article
+              }}</span>
+            </button>
+          </div>
+        </div>
+        <Button
+          size="md"
+          :loading="scanner.isProcessingTsd.value"
+          :disabled="!tsdInputProxy"
+          @click="submitTsd"
+        >
           Добавить
         </Button>
       </div>

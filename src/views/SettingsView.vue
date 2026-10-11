@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button, NavBar, Modal } from '@/components/ui'
 import { dbStore } from '@/lib/db'
@@ -9,6 +9,20 @@ const showResetModal = ref(false)
 const showRestoreModal = ref(false)
 const restoreFile = ref(null)
 const restoreSummary = ref(null)
+const storageInfo = ref({ size: null, warning: false })
+
+async function updateStorageInfo() {
+  const res = await dbStore.backup.exportAll()
+  if (res.error) return
+  const json = JSON.stringify(res.data)
+  const bytes = new Blob([json]).size
+  storageInfo.value.size = bytes
+  storageInfo.value.warning = bytes > 50 * 1024 * 1024
+}
+
+onMounted(() => {
+  updateStorageInfo()
+})
 
 async function confirmReset() {
   await dbStore.resetLocalData()
@@ -128,6 +142,21 @@ async function confirmRestore() {
           class="hidden"
           @change="onRestoreFilePicked"
         />
+      </div>
+
+      <!-- Хранилище -->
+      <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-4">
+        <h3 class="font-semibold text-slate-100">Хранилище</h3>
+        <p class="text-sm text-slate-400 mt-1 mb-2">Приблизительный размер локальной БД</p>
+        <div class="flex items-center justify-between text-sm">
+          <span class="text-slate-300">
+            {{ storageInfo.size ? (storageInfo.size / 1024 / 1024).toFixed(2) + ' МБ' : '—' }}
+          </span>
+          <Button variant="secondary" size="sm" @click="updateStorageInfo">Обновить</Button>
+        </div>
+        <p v-if="storageInfo.warning" class="text-amber-400 text-xs mt-2">
+          ⚠️ Размер > 50 МБ — рекомендуется сделать резервную копию и очистить старые данные
+        </p>
       </div>
 
       <!-- Очистка данных -->

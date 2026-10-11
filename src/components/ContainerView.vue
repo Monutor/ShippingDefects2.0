@@ -313,7 +313,10 @@ function handleScannerModalUpdate(val) {
             </div>
             <p class="text-slate-500 text-sm">Пока нет товаров. Отсканируйте штрихкод.</p>
           </div>
-          <div v-else class="items-list-detail space-y-2 max-h-72 overflow-y-auto scrollbar-thin">
+          <div
+            v-else
+            class="items-list-detail space-y-2 max-h-72 overflow-y-auto overflow-x-hidden scrollbar-thin"
+          >
             <div
               v-for="(item, index) in items"
               :key="item.number || index"
@@ -531,6 +534,9 @@ function handleScannerModalUpdate(val) {
 </template>
 
 <style scoped>
+.items-list-detail {
+  overflow-x: hidden;
+}
 .custom-btn-secondary {
   background: rgba(107, 114, 128, 0.2);
   border-color: rgba(107, 114, 128, 0.3);

@@ -40,12 +40,12 @@ function formatDate(dateString) {
       </div>
       <h3 class="text-lg font-semibold text-slate-100 mb-2">Сборка паллета</h3>
 
-      <div v-if="availableBoxes.length > 0" class="space-y-3 px-4 max-w-md mx-auto">
+      <div v-if="availableBoxes.length > 0" class="space-y-3 px-4 max-w-3xl mx-auto">
         <p class="text-slate-400 text-sm mb-3">
           Доступно готовых коробов: {{ availableBoxes.length }}
         </p>
         <div
-          class="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden divide-y divide-slate-700/50 max-h-64 overflow-y-auto scrollbar-thin"
+          class="bg-slate-800/60 border border-slate-700 rounded-xl overflow-hidden divide-y divide-slate-700/50 max-h-96 overflow-y-auto scrollbar-thin"
         >
           <div
             v-for="box in availableBoxes"

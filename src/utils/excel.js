@@ -146,6 +146,166 @@ function addLabelSheet(workbook, text) {
 }
 
 /**
+ * Создаёт лист Пломба с единым шаблоном для микса и паллета
+ */
+function createSealSheet(
+  workbook,
+  { containerLabel, number, quantityLabel, quantityValue, dateLabel, dateValue, footerText }
+) {
+  const sealSheet = workbook.addWorksheet('Пломба')
+  sealSheet.columns = [
+    { key: 'a', width: 35 },
+    { key: 'b', width: 35 }
+  ]
+
+  const blueColor = { argb: 'FF1989FA' }
+  const blackColor = { argb: 'FF000000' }
+  const grayColor = { argb: 'FF999999' }
+
+  // Строка 1: ПЛОМБА
+  const titleCell = sealSheet.getCell('A1')
+  titleCell.value = 'ПЛОМБА'
+  titleCell.font = { bold: true, size: 20, color: blueColor }
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' }
+  sealSheet.mergeCells('A1:B1')
+  sealSheet.getRow(1).height = 35
+  sealSheet.getRow(1).eachCell((cell) => {
+    cell.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    }
+  })
+
+  // Строка 2: ОП № 187 г.Тамбов
+  const opCell = sealSheet.getCell('A2')
+  opCell.value = 'ОП № 187 г.Тамбов'
+  opCell.font = { bold: true, size: 16, color: blueColor }
+  opCell.alignment = { horizontal: 'center', vertical: 'middle' }
+  sealSheet.mergeCells('A2:B2')
+  sealSheet.getRow(2).height = 30
+  sealSheet.getRow(2).eachCell((cell) => {
+    cell.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    }
+  })
+
+  // Строка 3: контейнер
+  const boxCell = sealSheet.getCell('A3')
+  boxCell.value = `${containerLabel} №${number ?? '—'}`
+  boxCell.font = { bold: true, size: 14, color: blackColor }
+  boxCell.alignment = { horizontal: 'center', vertical: 'middle' }
+  sealSheet.mergeCells('A3:B3')
+  sealSheet.getRow(3).height = 28
+  sealSheet.getRow(3).eachCell((cell) => {
+    cell.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    }
+  })
+
+  // Строка 4: количество
+  const qtyRow = sealSheet.getRow(4)
+  qtyRow.getCell('A').value = quantityLabel
+  qtyRow.getCell('A').font = { bold: true, size: 11 }
+  qtyRow.getCell('A').alignment = { horizontal: 'left', vertical: 'middle' }
+  qtyRow.getCell('B').value = `${quantityValue} шт.`
+  qtyRow.getCell('B').font = { size: 11 }
+  qtyRow.getCell('B').alignment = { horizontal: 'right', vertical: 'middle' }
+  qtyRow.height = 25
+  qtyRow.eachCell((cell) => {
+    cell.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    }
+  })
+
+  // Строка 5: дата
+  const dateRow = sealSheet.getRow(5)
+  dateRow.getCell('A').value = dateLabel
+  dateRow.getCell('A').font = { bold: true, size: 11 }
+  dateRow.getCell('A').alignment = { horizontal: 'left', vertical: 'middle' }
+  dateRow.getCell('B').value = new Date(dateValue).toLocaleString('ru-RU', {
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+  dateRow.getCell('B').font = { size: 11 }
+  dateRow.getCell('B').alignment = { horizontal: 'right', vertical: 'middle' }
+  dateRow.height = 25
+  dateRow.eachCell((cell) => {
+    cell.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    }
+  })
+
+  // Строка 6: Подпись
+  const signRow = sealSheet.getRow(6)
+  signRow.getCell('A').value = 'Подпись:'
+  signRow.getCell('A').font = { bold: true, size: 11 }
+  signRow.getCell('A').alignment = { horizontal: 'left', vertical: 'middle' }
+  signRow.getCell('B').value = ''
+  signRow.getCell('B').alignment = { horizontal: 'left', vertical: 'middle' }
+  signRow.height = 30
+  sealSheet.mergeCells('A6:B6')
+  signRow.eachCell((cell) => {
+    cell.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    }
+  })
+
+  // Строка 7: М.П.
+  const mpCell = sealSheet.getCell('A7')
+  mpCell.value = 'М.П.'
+  mpCell.font = { bold: true, size: 14, color: blackColor }
+  mpCell.alignment = { horizontal: 'left', vertical: 'middle' }
+  sealSheet.mergeCells('A7:B7')
+  sealSheet.getRow(7).height = 30
+  sealSheet.getRow(7).eachCell((cell) => {
+    cell.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    }
+  })
+
+  // Строка 8: нижний текст
+  const footerCell = sealSheet.getCell('A8')
+  footerCell.value = footerText || 'Пломба наклеивается для защиты содержимого'
+  footerCell.font = { italic: true, size: 9, color: grayColor }
+  footerCell.alignment = { horizontal: 'center', vertical: 'middle' }
+  sealSheet.mergeCells('A8:B8')
+  sealSheet.getRow(8).height = 20
+  sealSheet.getRow(8).eachCell((cell) => {
+    cell.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    }
+  })
+
+  return sealSheet
+}
+
+/**
  * Экспорт товаров конкретного короба с пломбой
  * @param {Object} box - объект короба
  * @returns {Object} результат экспорта
@@ -358,7 +518,7 @@ export async function exportBoxToExcel(box) {
 
     // Строка 8: Нижний текст
     const footerCell = sealSheet.getCell('A8')
-    footerCell.value = 'Пломба наклеивается на короб для защиты содержимого'
+    footerCell.value = 'Пломба наклеивается для защиты содержимого'
     footerCell.font = { italic: true, size: 9, color: grayColor }
     footerCell.alignment = { horizontal: 'center', vertical: 'middle' }
     sealSheet.mergeCells('A8:B8')
@@ -414,9 +574,28 @@ export async function exportSeparateToExcel(items) {
 
   try {
     const workbook = new Excel.Workbook()
-    const itemsSheet = workbook.addWorksheet('Товары')
 
-    itemsSheet.columns = [
+    // Загружаем базу для определения группы отгрузки
+    const brainRes = await db.brainItems.getAll()
+    const brainMap = new Map()
+    if (brainRes?.data) {
+      for (const b of brainRes.data) {
+        brainMap.set(b.barcode, b)
+      }
+    }
+
+    const groups = { '': [], ТВ: [], КБТ: [] }
+    items.forEach((item) => {
+      const brainItem = brainMap.get(item.number)
+      const group = (brainItem?.groupShipment || '').trim()
+      if (group === 'ТВ' || group === 'КБТ') {
+        groups[group].push(item)
+      } else {
+        groups[''].push(item)
+      }
+    })
+
+    const columns = [
       { header: 'Место', key: 'placeNumber', width: 10 },
       { header: 'Номер', key: 'number', width: 20 },
       { header: 'Наименование', key: 'name', width: 40 },
@@ -425,114 +604,55 @@ export async function exportSeparateToExcel(items) {
       { header: 'Дата сканирования', key: 'scannedAt', width: 22 }
     ]
 
-    items.forEach((item) => {
-      const dateStr = item.scannedAt ? new Date(item.scannedAt).toLocaleString('ru-RU') : '' // E1 fix: null-check
-      itemsSheet.addRow({
-        placeNumber: String(item.placeNumber).padStart(3, '0'),
-        number: item.number,
-        name: item.name,
-        article: item.article,
-        comment: item.comment || '',
-        scannedAt: dateStr
-      })
-    })
-
-    const headerRow = itemsSheet.getRow(1)
-    headerRow.font = { bold: true, size: 11 }
-    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F3FF' } }
-    headerRow.border = {
-      top: { style: 'thin' },
-      left: { style: 'thin' },
-      bottom: { style: 'thin' },
-      right: { style: 'thin' }
-    }
-
-    itemsSheet.eachRow((row, rowNumber) => {
-      if (rowNumber > 1) {
-        row.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
-        }
-      }
-    })
-
-    const sealSheet = workbook.addWorksheet('Пломба')
-    sealSheet.columns = [
-      { key: 'a', width: 35 },
-      { key: 'b', width: 35 }
+    const groupNames = [
+      { key: '', title: 'Без группы' },
+      { key: 'ТВ', title: 'Группа ТВ' },
+      { key: 'КБТ', title: 'Группа КБТ' }
     ]
 
-    const blueColor = { argb: 'FF1989FA' }
-    const blackColor = { argb: 'FF000000' }
-    const grayColor = { argb: 'FF999999' }
+    for (const g of groupNames) {
+      const groupItems = groups[g.key]
+      if (!groupItems || groupItems.length === 0) continue
 
-    const titleCell = sealSheet.getCell('A1')
-    titleCell.value = 'ПЛОМБА'
-    titleCell.font = { bold: true, size: 20, color: blueColor }
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' }
-    sealSheet.mergeCells('A1:B1')
-    sealSheet.getRow(1).height = 35
+      const sheet = workbook.addWorksheet(g.title)
+      sheet.columns = columns
 
-    const opCell = sealSheet.getCell('A2')
-    opCell.value = 'ОП № 187 г.Тамбов'
-    opCell.font = { bold: true, size: 16, color: blueColor }
-    opCell.alignment = { horizontal: 'center', vertical: 'middle' }
-    sealSheet.mergeCells('A2:B2')
-    sealSheet.getRow(2).height = 30
+      groupItems.forEach((item, idx) => {
+        const dateStr = item.scannedAt ? new Date(item.scannedAt).toLocaleString('ru-RU') : ''
+        sheet.addRow({
+          placeNumber: String(idx + 1).padStart(3, '0'),
+          number: item.number,
+          name: item.name,
+          article: item.article,
+          comment: item.comment || '',
+          scannedAt: dateStr
+        })
+      })
 
-    const boxCell = sealSheet.getCell('A3')
-    boxCell.value = 'Отдельные товары'
-    boxCell.font = { bold: true, size: 14, color: blackColor }
-    boxCell.alignment = { horizontal: 'center', vertical: 'middle' }
-    sealSheet.mergeCells('A3:B3')
-    sealSheet.getRow(3).height = 28
+      const headerRow = sheet.getRow(1)
+      headerRow.font = { bold: true, size: 11 }
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F3FF' } }
+      headerRow.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      }
 
-    const qtyRow = sealSheet.getRow(4)
-    qtyRow.getCell('A').value = 'Количество товаров:'
-    qtyRow.getCell('A').font = { bold: true, size: 11 }
-    qtyRow.getCell('B').value = `${items.length} шт.`
-    qtyRow.height = 25
-
-    const dateRow = sealSheet.getRow(5)
-    dateRow.getCell('A').value = 'Дата сборки:'
-    dateRow.getCell('A').font = { bold: true, size: 11 }
-    dateRow.getCell('B').value = new Date().toLocaleString('ru-RU', {
-      day: 'numeric',
-      month: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-    dateRow.height = 25
-
-    const signRow = sealSheet.getRow(6)
-    signRow.getCell('A').value = 'Подпись:'
-    signRow.getCell('A').font = { bold: true, size: 11 }
-    signRow.getCell('B').value = ''
-    signRow.height = 30
-    sealSheet.mergeCells('A6:B6')
-
-    const mpCell = sealSheet.getCell('A7')
-    mpCell.value = 'М.П.'
-    mpCell.font = { bold: true, size: 14, color: blackColor }
-    sealSheet.mergeCells('A7:B7')
-    sealSheet.getRow(7).height = 30
-
-    const footerCell = sealSheet.getCell('A8')
-    footerCell.value = 'Пломба наклеивается на короб для защиты содержимого'
-    footerCell.font = { italic: true, size: 9, color: grayColor }
-    footerCell.alignment = { horizontal: 'center', vertical: 'middle' }
-    sealSheet.mergeCells('A8:B8')
-    sealSheet.getRow(8).height = 20
+      sheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 1) {
+          row.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          }
+        }
+      })
+    }
 
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
     const fullName = `Отдельные_${timestamp}.xlsx`
-
-    // Вторая пломба на том же листе (опечатка с двух сторон) + лист с огромным номером
-    duplicateSheetBlock(sealSheet, 8)
-    addLabelSheet(workbook, 'ОТДЕЛЬНЫЕ')
 
     const buffer = await workbook.xlsx.writeBuffer()
     const blob = new Blob([buffer], {
@@ -762,23 +882,16 @@ export async function exportPalletToExcel(pallet) {
       (i) => i.source_type === 'separate_item' || i.source_type === 'inline'
     ).length
 
-    sealSheet.getRow(4).getCell('A').value = 'Коробов:'
+    sealSheet.getRow(4).getCell('A').value = 'Количество товаров:'
     sealSheet.getRow(4).getCell('A').font = { bold: true, size: 11 }
     sealSheet.getRow(4).getCell('A').alignment = { horizontal: 'left', vertical: 'middle' }
-    sealSheet.getRow(4).getCell('B').value = `${totalBoxes} шт.`
+    sealSheet.getRow(4).getCell('B').value = `${totalBoxes + totalItems} шт.`
     sealSheet.getRow(4).getCell('B').font = { size: 11 }
     sealSheet.getRow(4).getCell('B').alignment = { horizontal: 'right', vertical: 'middle' }
     sealSheet.getRow(4).height = 25
-    sealSheet.getRow(5).getCell('A').value = 'Товаров в паллете:'
-    sealSheet.getRow(5).getCell('A').font = { bold: true, size: 11 }
-    sealSheet.getRow(5).getCell('A').alignment = { horizontal: 'left', vertical: 'middle' }
-    sealSheet.getRow(5).getCell('B').value = `${totalItems} шт.`
-    sealSheet.getRow(5).getCell('B').font = { size: 11 }
-    sealSheet.getRow(5).getCell('B').alignment = { horizontal: 'right', vertical: 'middle' }
-    sealSheet.getRow(5).height = 25
 
-    const dateRow = sealSheet.getRow(6)
-    dateRow.getCell('A').value = 'Дата формирования:'
+    const dateRow = sealSheet.getRow(5)
+    dateRow.getCell('A').value = 'Дата сборки:'
     dateRow.getCell('A').font = { bold: true, size: 11 }
     dateRow.getCell('A').alignment = { horizontal: 'left', vertical: 'middle' }
     const dateVal = pallet.createdAt || pallet.created_at || new Date()
@@ -793,11 +906,12 @@ export async function exportPalletToExcel(pallet) {
     dateRow.getCell('B').alignment = { horizontal: 'right', vertical: 'middle' }
     dateRow.height = 25
 
-    sealSheet.getRow(7).getCell('A').value = 'Подпись:'
-    sealSheet.getRow(7).getCell('A').font = { bold: true, size: 11 }
-    sealSheet.getRow(7).getCell('A').alignment = { horizontal: 'left', vertical: 'middle' }
-    sealSheet.getRow(7).getCell('B').value = ''
-    sealSheet.getRow(7).height = 30
+    sealSheet.getRow(6).getCell('A').value = 'Подпись:'
+    sealSheet.getRow(6).getCell('A').font = { bold: true, size: 11 }
+    sealSheet.getRow(6).getCell('A').alignment = { horizontal: 'left', vertical: 'middle' }
+    sealSheet.getRow(6).getCell('B').value = ''
+    sealSheet.getRow(6).height = 30
+    sealSheet.mergeCells('A6:B6')
 
     sealSheet.getRow(4).eachCell((cell) => {
       cell.border = {
@@ -832,14 +946,14 @@ export async function exportPalletToExcel(pallet) {
       }
     })
 
-    sealSheet.getCell('A8').value = 'М.П.'
-    sealSheet.getCell('A8').font = { bold: true, size: 14, color: blackColor }
-    sealSheet.mergeCells('A8:B8')
-    const footerCell = sealSheet.getCell('A9')
-    footerCell.value = 'Пломба наклеивается на паллет для защиты содержимого'
+    sealSheet.getCell('A7').value = 'М.П.'
+    sealSheet.getCell('A7').font = { bold: true, size: 14, color: blackColor }
+    sealSheet.mergeCells('A7:B7')
+    const footerCell = sealSheet.getCell('A8')
+    footerCell.value = 'Пломба наклеивается для защиты содержимого'
     footerCell.font = { italic: true, size: 9, color: grayColor }
     footerCell.alignment = { horizontal: 'center', vertical: 'middle' }
-    sealSheet.mergeCells('A9:B9')
+    sealSheet.mergeCells('A8:B8')
 
     for (let i = 1; i <= 9; i++)
       sealSheet.getRow(i).eachCell((cell) => {
@@ -855,7 +969,7 @@ export async function exportPalletToExcel(pallet) {
     const fullName = `Паллет_${pallet.number}_${timestamp}.xlsx`
 
     // Вторая пломба на том же листе (опечатка с двух сторон) + лист с огромным номером
-    duplicateSheetBlock(sealSheet, 9)
+    duplicateSheetBlock(sealSheet, 8)
     addLabelSheet(workbook, `ПАЛЛЕТ-${pallet.number}`)
 
     const buffer = await workbook.xlsx.writeBuffer()

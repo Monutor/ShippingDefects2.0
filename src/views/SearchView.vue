@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBrainStore } from '@/stores/brain'
 import { NavBar } from '@/components/ui'
@@ -14,6 +14,32 @@ const searched = ref(false)
 const results = ref([])
 const locationIndex = ref(null)
 const searchInput = ref(null)
+const showSuggestions = ref(false)
+
+const suggestions = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  if (!q) return []
+  return (brainStore.items || [])
+    .filter((item) => {
+      const num = String(item.number || '').toLowerCase()
+      const name = String(item.name || '').toLowerCase()
+      const art = String(item.article || '').toLowerCase()
+      return num.includes(q) || name.includes(q) || art.includes(q)
+    })
+    .slice(0, 20)
+})
+
+function selectSuggestion(item) {
+  query.value = item.number
+  showSuggestions.value = false
+  runSearch()
+}
+
+function hideSuggestions() {
+  window.setTimeout(() => {
+    showSuggestions.value = false
+  }, 200)
+}
 
 onMounted(async () => {
   try {
@@ -76,7 +102,7 @@ function goTo(result) {
   <div class="search-view min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
     <NavBar title="Поиск" left-text="Назад" left-arrow @click-left="$router.back()" />
 
-    <main class="px-4 py-4 max-w-[500px] w-full mx-auto">
+    <main class="px-4 py-4 mx-auto">
       <!-- Строка поиска: ТСД-сканер вводит сюда текст и жмёт Enter -->
       <form
         class="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-2xl p-4 mb-4"
@@ -96,13 +122,35 @@ function goTo(result) {
               d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
             />
           </svg>
-          <input
-            ref="searchInput"
-            v-model="query"
-            type="text"
-            placeholder="Номер, название или код товара"
-            class="flex-1 bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-2.5 outline-none text-slate-100 placeholder-slate-400 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all"
-          />
+          <div class="relative flex-1">
+            <input
+              ref="searchInput"
+              v-model="query"
+              type="text"
+              placeholder="Номер, название или код товара"
+              class="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-2.5 outline-none text-slate-100 placeholder-slate-400 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all"
+              @focus="showSuggestions = true"
+              @blur="hideSuggestions"
+            />
+            <div
+              v-if="showSuggestions && suggestions.length > 0"
+              class="absolute z-50 mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl shadow-lg max-h-64 overflow-y-auto"
+            >
+              <button
+                v-for="item in suggestions"
+                :key="item.number"
+                type="button"
+                class="w-full text-left px-3 py-2 hover:bg-slate-700 flex items-center gap-2"
+                @mousedown.prevent="selectSuggestion(item)"
+              >
+                <span class="text-xs font-mono text-slate-400">{{ item.number }}</span>
+                <span class="text-sm text-slate-100 truncate">{{ item.name }}</span>
+                <span v-if="item.article" class="text-xs text-slate-500 ml-auto">{{
+                  item.article
+                }}</span>
+              </button>
+            </div>
+          </div>
           <button
             v-if="query"
             type="button"

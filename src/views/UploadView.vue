@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useBrainStore } from '@/stores/brain'
 import { exportToExcel } from '@/utils/excel'
 import { buildLocationIndex, lookupLocation } from '@/utils/locations'
+import * as XLSX from 'xlsx'
 import { Button, NavBar, Modal } from '@/components/ui'
 
 const brainStore = useBrainStore()
@@ -35,11 +36,15 @@ const filteredItems = computed(() => {
     const name = String(item.name || '').toLowerCase()
     const article = String(item.article || '').toLowerCase()
     const comment = String(item.comment || '').toLowerCase()
+    const groupShipment = String(item.groupShipment || '').toLowerCase()
+    const section = String(item.section || '').toLowerCase()
     return (
       number.includes(query) ||
       name.includes(query) ||
       article.includes(query) ||
-      comment.includes(query)
+      comment.includes(query) ||
+      groupShipment.includes(query) ||
+      section.includes(query)
     )
   })
 })
@@ -147,13 +152,44 @@ function downloadDatabase() {
     Наименование: item.name || '',
     'Код товара': item.article || '',
     Комментарий: item.comment || '',
+    'Группа отгрузки': item.groupShipment || '',
+    Секция: item.section || '',
     Место: itemLocation(item)
   }))
-  const result = exportToExcel(rows, 'База_брака')
-  if (result.success) {
+
+  try {
+    const workbook = XLSX.utils.book_new()
+    // Общая база
+    const wsAll = XLSX.utils.json_to_sheet(rows)
+    XLSX.utils.book_append_sheet(workbook, wsAll, 'Общая база')
+
+    // Группы
+    const groups = ['КБТ', 'ТВ', 'КОФЕ']
+    groups.forEach((g) => {
+      const filtered = rows.filter(
+        (r) =>
+          String(r['Группа отгрузки'] || '')
+            .trim()
+            .toUpperCase() === g.toUpperCase()
+      )
+      if (filtered.length > 0) {
+        const ws = XLSX.utils.json_to_sheet(filtered)
+        XLSX.utils.book_append_sheet(workbook, ws, g)
+      }
+    })
+
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-')
+    const fullName = `База_брака_${timestamp}.xlsx`
+    XLSX.writeFile(workbook, fullName)
     window.showToast(`База выгружена: ${rows.length} товаров`, 2500, 'success')
-  } else {
-    window.showToast('Не удалось выгрузить базу')
+  } catch (error) {
+    // fallback to single sheet
+    const result = exportToExcel(rows, 'База_брака')
+    if (result.success) {
+      window.showToast(`База выгружена: ${rows.length} товаров`, 2500, 'success')
+    } else {
+      window.showToast('Не удалось выгрузить базу')
+    }
   }
 }
 
@@ -262,6 +298,8 @@ watch(
               <span class="th-name">Наименование</span>
               <span class="th-article">Код</span>
               <span class="th-comment">Комментарий</span>
+              <span class="th-group">Группа</span>
+              <span class="th-section">Секция</span>
               <span class="th-place">Место</span>
             </div>
             <div
@@ -276,6 +314,8 @@ watch(
                 <span v-if="isStopItem(item)" class="stop-badge">⛔</span>
                 {{ item.comment || '—' }}
               </span>
+              <span class="td-group">{{ item.groupShipment || '—' }}</span>
+              <span class="td-section">{{ item.section || '—' }}</span>
               <span class="td-place" :class="{ empty: itemLocation(item) === '—' }">
                 {{ itemLocation(item) }}
               </span>
@@ -373,13 +413,23 @@ watch(
 .td-name,
 .td-article,
 .td-comment,
-.td-place {
+.td-place,
+.td-group,
+.td-section {
   display: block;
   grid-column: auto !important;
+  margin-bottom: 0.5rem;
+}
+
+.td-number,
+.td-name,
+.td-article,
+.td-comment,
+.td-place,
+.td-group {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 0.5rem;
 }
 
 .td-number {
@@ -451,11 +501,25 @@ watch(
   padding: 0.25rem 0;
 }
 
+.td-group {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.td-section {
+  font-size: 0.875rem;
+  color: #f1f5f9;
+  white-space: normal;
+  line-height: 1.3;
+}
+
 /* Табличный вид для планшетов и десктопов (от 640px) */
 @media (min-width: 640px) {
   .table-header {
     display: grid;
-    grid-template-columns: 1.4fr 2.6fr 1.2fr 2.2fr 0.9fr;
+    grid-template-columns: 1.2fr 2.4fr 1fr 2fr 1fr 0.8fr 0.9fr;
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     background: rgba(255, 255, 255, 0.03);
@@ -467,7 +531,7 @@ watch(
 
   .table-row {
     display: grid;
-    grid-template-columns: 1.4fr 2.6fr 1.2fr 2.2fr 0.9fr;
+    grid-template-columns: 1.2fr 2.4fr 1fr 2fr 1fr 0.8fr 0.9fr;
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     background: transparent;

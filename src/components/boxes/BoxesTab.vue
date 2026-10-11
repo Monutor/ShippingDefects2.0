@@ -13,10 +13,12 @@ defineEmits(['request-delete', 'load-items', 'export-all'])
 const router = useRouter()
 
 // Сортировки в БД нет (toArray без orderBy отдаёт в порядке случайных UUID),
-// поэтому сортируем здесь: новые сверху по дате создания, при равной — по номеру
+// поэтому сортируем здесь: новые сверху по дате завершения/создания, при равной — по номеру
 const sortedBoxes = computed(() =>
   [...props.boxes].sort((a, b) => {
-    const byDate = String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
+    const dateA = a.finished_at || a.createdAt || ''
+    const dateB = b.finished_at || b.createdAt || ''
+    const byDate = String(dateB).localeCompare(String(dateA))
     if (byDate !== 0) return byDate
     return Number(b.number || 0) - Number(a.number || 0)
   })
@@ -59,16 +61,12 @@ function formatDate(dateString) {
             <div class="flex-1 min-w-0">
               <h3 class="font-semibold text-lg text-slate-100 mb-1">{{ box.name }}</h3>
               <p class="text-sm text-slate-400">
-                <template v-if="box.itemsLoaded">
-                  <span class="font-medium text-amber-400">{{ box.items.length }}</span>
-                  товаров <span class="mx-2 text-slate-600">•</span>
-                  {{ formatDate(box.createdAt) }} завершён
-                </template>
-                <template v-else>
-                  нажмите чтобы посмотреть
-                  <span class="mx-2 text-slate-600">•</span>
-                  {{ formatDate(box.createdAt) }} завершён
-                </template>
+                📦
+                <span class="font-medium text-amber-400">{{
+                  box.itemsLoaded ? box.items.length : (box.itemCount ?? 0)
+                }}</span>
+                товаров <span class="mx-2 text-slate-600">•</span>
+                {{ formatDate(box.finished_at || box.createdAt) }} завершён
               </p>
             </div>
             <span class="text-slate-500 flex-shrink-0 self-center">

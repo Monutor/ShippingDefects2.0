@@ -160,26 +160,33 @@ export const useBoxesStore = defineStore(
           }
         })
 
-        // Lazy load: не грузим items для всех finished коробов — только базовые данные
-        const boxesWithItems = finishedBoxesRaw
-          .map((box) => {
+        // Lazy load: не грузим items для всех finished коробов — только базовые данные + счётчик
+        const boxesWithItems = await Promise.all(
+          finishedBoxesRaw.map(async (box) => {
             if (!box.id) return null
-            // Восстанавливаем lazy-loaded items из предыдущего состояния если они есть
             const prevItems = prevItemsMap.get(box.id) || []
+            const itemsLoaded = prevItemsMap.has(box.id)
+            let itemCount = prevItems.length
+            if (!itemsLoaded) {
+              const cntRes = await db.boxItems.countByBoxId(box.id)
+              itemCount = cntRes.error ? 0 : cntRes.data
+            }
             return {
               id: box.id,
               number: box.box_number || box.number || 0,
               name: box.name,
               createdAt: box.created_at,
+              finished_at: box.finished_at,
               status: box.status,
-              items: prevItems.length > 0 ? prevItems : [], // restore если были загружены ранее
-              itemsLoaded: prevItemsMap.has(box.id) // помечаем что items уже загружены
+              items: prevItems.length > 0 ? prevItems : [],
+              itemsLoaded,
+              itemCount
             }
           })
-          .filter(Boolean)
+        )
 
-        boxes.value = boxesWithItems
-        return boxesWithItems
+        boxes.value = boxesWithItems.filter(Boolean)
+        return boxes.value
       } catch {
         return []
       }

@@ -22,7 +22,9 @@ export const useBrainStore = defineStore(
       number: null,
       name: null,
       article: null,
-      comment: null
+      comment: null,
+      groupShipment: null,
+      section: null
     })
 
     // Статус синхронизации
@@ -54,7 +56,11 @@ export const useBrainStore = defineStore(
           number,
           name: nameVal || 'Без названия', // Fallback на "Без названия" если пусто после trim
           article: String(item[mapping.article] || '').trim(),
-          comment: mapping.comment ? String(item[mapping.comment] || '').trim() : ''
+          comment: mapping.comment ? String(item[mapping.comment] || '').trim() : '',
+          groupShipment: mapping.groupShipment
+            ? String(item[mapping.groupShipment] || '').trim()
+            : '',
+          section: mapping.section ? String(item[mapping.section] || '').trim() : ''
         }
       })
       columnMapping.value = mapping
@@ -88,14 +94,18 @@ export const useBrainStore = defineStore(
               number: String(number),
               name: (item.name || '').trim() || 'Без названия', // Fallback на "Без названия" если пусто
               article: item.article || '',
-              comment: item.comment || ''
+              comment: item.comment || '',
+              groupShipment: item.groupShipment || '',
+              section: item.section || ''
             }
           })
           columnMapping.value = {
             number: 'number',
             name: 'name',
             article: 'article',
-            comment: 'comment'
+            comment: 'comment',
+            groupShipment: 'groupShipment',
+            section: 'section'
           }
         } else {
           items.value = []
@@ -140,7 +150,14 @@ export const useBrainStore = defineStore(
       }
 
       items.value = []
-      columnMapping.value = { number: null, name: null, article: null, comment: null }
+      columnMapping.value = {
+        number: null,
+        name: null,
+        article: null,
+        comment: null,
+        groupShipment: null,
+        section: null
+      }
 
       try {
         await deleteBrainItemsFromBackend()

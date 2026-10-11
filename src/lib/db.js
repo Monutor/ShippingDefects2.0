@@ -235,7 +235,14 @@ export const dbStore = {
     async getAll() {
       const rows = await db.brain_items.toArray()
       return ok(
-        rows.map((r) => ({ barcode: r.barcode, name: r.name, brand: r.brand, comment: r.comment }))
+        rows.map((r) => ({
+          barcode: r.barcode,
+          name: r.name,
+          brand: r.brand,
+          comment: r.comment,
+          groupShipment: r.groupShipment,
+          section: r.section
+        }))
       )
     },
     async import({ rows }) {
@@ -377,6 +384,10 @@ export const dbStore = {
           created_at: r.created_at
         }))
       )
+    },
+    async countByBoxId(boxId) {
+      const count = await db.box_items.where('boxId').equals(boxId).count()
+      return ok(count, null)
     },
     // Поиск товара по штрихкоду во ВСЕХ миксах, включая завершённые и незагруженные
     // в память стора. БД — источник истины для проверки дубликатов со стороны паллеты:

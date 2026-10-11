@@ -114,9 +114,21 @@ if (redirectPath) {
   router.replace(path || '/')
 }
 
+// Блокировка авто-поворота для ТСД
+function lockPortrait() {
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('portrait-primary').catch(() => {})
+    }
+  } catch {}
+}
+
 // Запускаем инициализацию после монтирования
 router.isReady().then(() => {
   initializeApp()
+  // Пытаемся зафиксировать ориентацию после первого взаимодействия/монтирования
+  lockPortrait()
+  window.addEventListener('orientationchange', lockPortrait)
 })
 
 app.mount('#app')
