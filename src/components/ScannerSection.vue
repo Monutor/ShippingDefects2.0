@@ -65,6 +65,10 @@ function handleSelectCamera(deviceId) {
 async function submitTsd() {
   const input = props.scanner.tsdInput.value?.trim()
   if (!input) return
+  // Очищаем поле до обработки: при дубле или ошибке старый код не должен
+  // оставаться вводе — на ТСД следующий скан пришёл бы поверх него.
+  props.scanner.tsdInput.value = ''
+  showSuggestions.value = false
   try {
     if (props.onTsdSubmit) await props.onTsdSubmit(input)
     else emit('tsd-submit', input)
@@ -73,7 +77,6 @@ async function submitTsd() {
     if (navigator.vibrate) navigator.vibrate([100, 50, 100])
     window.showToast(err.message || 'Ошибка обработки кода')
   }
-  showSuggestions.value = false
 }
 
 function selectSuggestion(item) {
