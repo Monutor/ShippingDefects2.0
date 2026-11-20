@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useBrainStore } from '@/stores/brain'
 import { displayStoreNumber, isConfigured } from '@/lib/storeProfile'
 import { readExcelFile, getColumnHeaders } from '@/utils/excel'
-import { FileUpload } from '@/components/ui'
+import { Button, FileUpload } from '@/components/ui'
 
 const router = useRouter()
 const brainStore = useBrainStore()
@@ -148,6 +148,11 @@ function autoMapColumns(headers) {
       </div>
     </div>
 
+    <!-- Инструкция для новых пользователей -->
+    <div class="help-section">
+      <Button variant="secondary" block @click="router.push('/help')">📖 Как пользоваться</Button>
+    </div>
+
     <p class="menu-hint">Используйте меню внизу для навигации</p>
   </div>
 </template>
@@ -238,6 +243,13 @@ function autoMapColumns(headers) {
 
 /* Upload section */
 .upload-section {
+  width: 100%;
+  max-width: 500px;
+  margin-bottom: 1.5rem;
+}
+
+/* Инструкция */
+.help-section {
   width: 100%;
   max-width: 500px;
   margin-bottom: 1.5rem;
