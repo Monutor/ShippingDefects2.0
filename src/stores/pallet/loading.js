@@ -298,7 +298,16 @@ export function usePalletLoading(context) {
           } catch (err) {
             console.error('[pallet/loading] failed to fetch box items for pallet enrichment:', err)
           }
-          return { ...pallet, items: serverItems, createdAt: pallet.created_at }
+          // Нормализуем поля UI-формы (как в других загрузчиках): строка БД
+          // содержит pallet_number/id, а стору нужны number и backendId —
+          // иначе currentPallet из этого списка даёт «Товар уже в паллете №» без номера
+          return {
+            ...pallet,
+            number: pallet.pallet_number || 0,
+            items: serverItems,
+            createdAt: pallet.created_at,
+            backendId: pallet.id
+          }
         })
       )
       return palletsWithItems
