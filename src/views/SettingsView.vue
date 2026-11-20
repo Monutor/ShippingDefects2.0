@@ -3,10 +3,19 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button, NavBar, Modal } from '@/components/ui'
 import { dbStore } from '@/lib/db'
+import {
+  storeProfile,
+  displayStoreNumber,
+  currentSealText,
+  setStoreProfile
+} from '@/lib/storeProfile'
 
 const router = useRouter()
 const showResetModal = ref(false)
 const showRestoreModal = ref(false)
+const showStoreModal = ref(false)
+const storeNumberInput = ref('')
+const storeSealInput = ref('')
 const restoreFile = ref(null)
 const restoreSummary = ref(null)
 const storageInfo = ref({ size: null, warning: false })
@@ -29,6 +38,41 @@ async function confirmReset() {
   showResetModal.value = false
   window.showToast('✅ Локальные данные очищены. Перезагрузка…')
   setTimeout(() => window.location.reload(), 600)
+}
+
+async function confirmStoreChange() {
+  const n = storeNumberInput.value.trim()
+  const s = storeSealInput.value.trim()
+  if (!/^\d{3}$/.test(n)) {
+    window.showToast('Номер магазина — ровно 3 цифры', 4000, 'error')
+    return
+  }
+  if (!s) {
+    window.showToast('Пломба не может быть пустой', 4000, 'error')
+    return
+  }
+  try {
+    // Смена только пломбы — данные целы; смена номера — полный сброс
+    if (storeProfile.value && n === storeProfile.value.number) {
+      await setStoreProfile(n, s)
+      showStoreModal.value = false
+      window.showToast('✅ Пломба обновлена')
+      return
+    }
+    await dbStore.resetLocalData()
+    await setStoreProfile(n, s)
+    showStoreModal.value = false
+    window.showToast('Магазин изменён. Перезагрузка…')
+    setTimeout(() => window.location.reload(), 600)
+  } catch (err) {
+    window.showToast(err.message || 'Не удалось сохранить', 4000, 'error')
+  }
+}
+
+function openStoreModal() {
+  storeNumberInput.value = storeProfile.value ? storeProfile.value.number : ''
+  storeSealInput.value = storeProfile.value ? storeProfile.value.sealText : ''
+  showStoreModal.value = true
 }
 
 async function downloadBackup() {
@@ -108,6 +152,23 @@ async function confirmRestore() {
     <NavBar title="Настройки" left-text="Назад" left-arrow @click-left="$router.back()" />
 
     <main class="px-4 py-4 max-w-[500px] w-full mx-auto space-y-4">
+      <!-- Магазин -->
+      <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <h3 class="font-semibold text-slate-100">Магазин</h3>
+              <span
+                class="text-xs font-mono bg-primary-500/15 text-primary-400 border border-primary-500/30 rounded-lg px-2 py-0.5"
+                >S{{ displayStoreNumber() }}</span
+              >
+            </div>
+            <p class="text-sm text-slate-400 mt-1 break-words">{{ currentSealText() }}</p>
+          </div>
+          <Button variant="secondary" size="sm" @click="openStoreModal">Изменить</Button>
+        </div>
+      </div>
+
       <!-- Импорт готовых данных -->
       <div class="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-2xl p-4">
         <div class="flex items-center justify-between gap-3">
@@ -208,6 +269,42 @@ async function confirmRestore() {
       <p class="text-rose-400 text-sm text-center mt-2 font-medium">
         ⚠️ Это действие нельзя отменить.
       </p>
+    </Modal>
+
+    <!-- Магазин: смена -->
+    <Modal
+      v-model="showStoreModal"
+      title="Магазин"
+      show-cancel
+      confirm-text="Сохранить"
+      cancel-text="Отмена"
+      confirm-color="danger"
+      @confirm="confirmStoreChange"
+    >
+      <div class="text-left space-y-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Номер магазина (3 цифры)</label>
+          <input
+            v-model="storeNumberInput"
+            type="text"
+            inputmode="numeric"
+            maxlength="3"
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 font-mono focus:outline-none focus:border-primary-500"
+          />
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Текст пломбы</label>
+          <input
+            v-model="storeSealInput"
+            type="text"
+            class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-100 focus:outline-none focus:border-primary-500"
+          />
+        </div>
+        <p class="text-xs text-rose-400">
+          Смена магазина сотрёт все локальные данные: миксы, паллеты, отдельные, базу брака и
+          историю. Отменить это нельзя.
+        </p>
+      </div>
     </Modal>
   </div>
 </template>
