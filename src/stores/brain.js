@@ -45,16 +45,15 @@ export const useBrainStore = defineStore(
      * Загрузка данных из распарсенного Excel
      */
     async function setDatabase(data, mapping) {
-      let skippedForeign = 0
       const mapped = []
       for (const item of data) {
         let number = String(item[mapping.number] || '').trim()
         try {
-          // Нормализуем номер: префикс текущего магазина; чужой магазин — строка пропускается
+          // Нормализуем номер: префикс текущего магазина
           number = ensurePrefix(number)
-        } catch {
-          skippedForeign++
-          continue
+        } catch (e) {
+          // Хотя бы одна строка чужого магазина — файл грузить нельзя целиком
+          throw new Error(`База не принадлежит текущему магазину — ${e.message}`)
         }
 
         const nameVal = (item[mapping.name] || 'Без названия')?.toString().trim()
@@ -83,10 +82,6 @@ export const useBrainStore = defineStore(
       } finally {
         isSyncing.value = false
       }
-
-      if (skippedForeign > 0) {
-        window.showToast(`⚠️ Пропущено строк (чужой магазин): ${skippedForeign}`, 4000, 'error')
-      }
     }
 
     /**
@@ -100,7 +95,12 @@ export const useBrainStore = defineStore(
         if (data && data.length > 0) {
           items.value = data.map((item, index) => {
             let number = item.number || ''
-            number = ensurePrefix(number)
+            try {
+              number = ensurePrefix(number)
+            } catch {
+              // Чужой/битый номер — оставляем как есть: одна такая строка
+              // не должна терять всю базу при загрузке с устройства
+            }
             return {
               id: index,
               number: String(number),

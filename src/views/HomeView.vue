@@ -50,7 +50,7 @@ async function handleFileSelect(file) {
     }, 500)
   } catch (err) {
     error.value = err.message
-    window.showToast('Ошибка загрузки файла')
+    window.showToast(err.message || 'Ошибка загрузки файла', 4000, 'error')
   } finally {
     isLoading.value = false
   }
