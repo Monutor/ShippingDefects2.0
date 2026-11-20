@@ -134,7 +134,15 @@ export const useBoxesStore = defineStore(
               comment: item.comment || '',
               scannedAt: item.created_at
             }))
-            return { ...box, items, createdAt: box.created_at, backendId: box.id }
+            // Нормализуем форму строки БД: у сырой строки есть box_number, но нет number —
+            // без этого currentBox, выбранный из списка активных, даёт «микс №undefined» в тостах
+            return {
+              ...box,
+              number: box.box_number || 0,
+              items,
+              createdAt: box.created_at,
+              backendId: box.id
+            }
           })
         )
 
