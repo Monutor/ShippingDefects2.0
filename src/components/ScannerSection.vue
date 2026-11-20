@@ -1,8 +1,9 @@
 <!-- eslint-disable vue/no-mutating-props -->
 <script setup>
-import { watch, nextTick, computed, ref } from 'vue'
+import { watch, nextTick, computed, ref, onMounted } from 'vue'
 import { Button, Input } from '@/components/ui'
 import { useBrainStore } from '@/stores/brain'
+import { buildLocationIndex, lookupLocation } from '@/utils/locations'
 
 const props = defineProps({
   scanner: { type: Object, required: true },
@@ -11,6 +12,19 @@ const props = defineProps({
 
 const brainStore = useBrainStore()
 const showSuggestions = ref(false)
+
+// Индекс размещений (как в «Поиске»): бейджи «М7»/«М7 → П3»/«П3»/«В» в подсказках.
+const locationIndex = ref(null)
+
+async function refreshLocationIndex() {
+  try {
+    locationIndex.value = await buildLocationIndex()
+  } catch {
+    // нет индекса — подсказки просто без бейджей
+  }
+}
+
+onMounted(() => refreshLocationIndex())
 
 const tsdInputProxy = computed({
   get: () => props.scanner?.tsdInput?.value ?? '',
@@ -32,6 +46,7 @@ const suggestions = computed(() => {
       return num.includes(q) || name.includes(q) || art.includes(q)
     })
     .slice(0, 20)
+    .map((item) => ({ ...item, location: lookupLocation(locationIndex.value, item.number) }))
 })
 
 watch(query, (q) => {
@@ -77,6 +92,14 @@ async function submitTsd() {
     if (navigator.vibrate) navigator.vibrate([100, 50, 100])
     window.showToast(err.message || 'Ошибка обработки кода')
   }
+  // после добав/ошибки размещения могли измениться — перестроить индекс бейджей
+  await refreshLocationIndex()
+}
+
+function badgeClass(kind) {
+  if (kind === 'box') return 'bg-primary-500/20 text-primary-400 border-primary-500/30'
+  if (kind === 'pallet-inline') return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+  return 'bg-slate-600/40 text-slate-300 border-slate-500/30'
 }
 
 function selectSuggestion(item) {
@@ -166,6 +189,12 @@ function hideSuggestions() {
             >
               <span class="text-xs font-mono text-slate-400">{{ item.number }}</span>
               <span class="text-sm text-slate-100 truncate">{{ item.name }}</span>
+              <span
+                v-if="item.location"
+                class="text-xs px-1.5 py-0.5 rounded border shrink-0"
+                :class="badgeClass(item.location.kind)"
+                >{{ item.location.label }}</span
+              >
               <span v-if="item.article" class="text-xs text-slate-500 ml-auto">{{
                 item.article
               }}</span>
