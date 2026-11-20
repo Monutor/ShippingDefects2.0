@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import Excel from 'exceljs'
 import { dbStore as db } from '@/lib/db.js'
+import { currentSealText } from '@/lib/storeProfile'
 
 /**
  * Читает Excel файл и возвращает сырые данные
@@ -178,9 +179,9 @@ function createSealSheet(
     }
   })
 
-  // Строка 2: ОП № 187 г.Тамбов
+  // Строка 2: текст пломбы из профиля магазина
   const opCell = sealSheet.getCell('A2')
-  opCell.value = 'ОП № 187 г.Тамбов'
+  opCell.value = currentSealText()
   opCell.font = { bold: true, size: 16, color: blueColor }
   opCell.alignment = { horizontal: 'center', vertical: 'middle' }
   sealSheet.mergeCells('A2:B2')
@@ -400,9 +401,9 @@ export async function exportBoxToExcel(box) {
       }
     })
 
-    // Строка 2: ОП № 187 г.Тамбов (статичный текст)
+    // Строка 2: текст пломбы из профиля магазина
     const opCell = sealSheet.getCell('A2')
-    opCell.value = 'ОП № 187 г.Тамбов'
+    opCell.value = currentSealText()
     opCell.font = { bold: true, size: 16, color: blueColor }
     opCell.alignment = { horizontal: 'center', vertical: 'middle' }
     sealSheet.mergeCells('A2:B2')
@@ -857,7 +858,7 @@ export async function exportPalletToExcel(pallet) {
     sealSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' }
     sealSheet.mergeCells('A1:B1')
     sealSheet.getRow(1).height = 35
-    sealSheet.getCell('A2').value = 'ОП № 187 г.Тамбов'
+    sealSheet.getCell('A2').value = currentSealText()
     sealSheet.getCell('A2').font = { bold: true, size: 16, color: blueColor }
     sealSheet.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' }
     sealSheet.mergeCells('A2:B2')
