@@ -134,11 +134,16 @@ export function createImportReport(fileName, type) {
   }
 }
 
-// Номер из файла → нормализованный вид базы («187/45328»). null = мусор.
+// Номер из файла → нормализованный вид базы («NNN/XXXXX»). null = мусор/чужой магазин.
 export function normalizeImportNumber(raw) {
   const s = str(raw)
   if (!s) return null
-  return parseBarcodeToBrainNumber(s)
+  try {
+    return parseBarcodeToBrainNumber(s)
+  } catch {
+    // Чужой магазин или профиль не настроен — строка попадёт в отчёт невалидных
+    return null
+  }
 }
 
 // Где уже лежит штрихкод: микс (включая завершённые) или inline-товар паллеты.
@@ -271,7 +276,7 @@ export async function importSeparate(rows, brainSet, report) {
     const all = (await db.separateItems.getAll()).data || []
     for (const i of all) {
       if (i.barcode) existingBarcodes.add(i.barcode)
-      const p = parseBarcodeToBrainNumber(i.barcode)
+      const p = normalizeImportNumber(i.barcode)
       if (p) existingBarcodes.add(p)
     }
   } catch {
@@ -409,7 +414,7 @@ export async function importPallet(parsed, fileNumber, brainSet, report) {
     const cache = await getSeparateCache()
     let entry = cache.find((i) => {
       if (i.barcode === barcode) return true
-      return parseBarcodeToBrainNumber(i.barcode) === barcode
+      return normalizeImportNumber(i.barcode) === barcode
     })
     if (!entry) {
       const usage = await findBarcodeUsage(barcode, palletId)

@@ -45,14 +45,21 @@ export const useBrainStore = defineStore(
      * Загрузка данных из распарсенного Excel
      */
     async function setDatabase(data, mapping) {
-      items.value = data.map((item, index) => {
+      let skippedForeign = 0
+      const mapped = []
+      for (const item of data) {
         let number = String(item[mapping.number] || '').trim()
-        // Нормализуем номер: добавляем префикс 187/ если нет
-        number = ensurePrefix(number)
+        try {
+          // Нормализуем номер: префикс текущего магазина; чужой магазин — строка пропускается
+          number = ensurePrefix(number)
+        } catch {
+          skippedForeign++
+          continue
+        }
 
         const nameVal = (item[mapping.name] || 'Без названия')?.toString().trim()
-        return {
-          id: index,
+        mapped.push({
+          id: mapped.length,
           number,
           name: nameVal || 'Без названия', // Fallback на "Без названия" если пусто после trim
           article: String(item[mapping.article] || '').trim(),
@@ -61,8 +68,9 @@ export const useBrainStore = defineStore(
             ? String(item[mapping.groupShipment] || '').trim()
             : '',
           section: mapping.section ? String(item[mapping.section] || '').trim() : ''
-        }
-      })
+        })
+      }
+      items.value = mapped
       columnMapping.value = mapping
 
       // Синхронизация с локальной базой (в фоне, не блокирует UI)
@@ -74,6 +82,10 @@ export const useBrainStore = defineStore(
         syncError.value = 'Не удалось сохранить данные в локальное хранилище.'
       } finally {
         isSyncing.value = false
+      }
+
+      if (skippedForeign > 0) {
+        window.showToast(`⚠️ Пропущено строк (чужой магазин): ${skippedForeign}`, 4000, 'error')
       }
     }
 
