@@ -6,7 +6,7 @@ const router = useRouter()
 
 <template>
   <div class="min-h-screen px-4 pt-4 pb-40">
-    <div class="max-w-md mx-auto">
+    <div class="max-w-[65rem] mx-auto">
       <button
         class="flex items-center gap-2 text-slate-400 hover:text-slate-100 transition-colors mb-4"
         @click="router.push('/')"
