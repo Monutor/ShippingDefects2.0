@@ -29,13 +29,13 @@ function assertOwnStore(number) {
  * Преобразует штрихкод со сканера в номер этикетки брака с учётом
  * профиля текущего магазина.
  *
- * Формат штрихкода: Z018700453282
- * Формат в БД: 187/45328
+ * Формат штрихкода: Z0{NNN}00{XXXXX} (NNN — номер текущего магазина)
+ * Формат в БД: {NNN}/{XXXXX}
  *
  * Логика:
- * - Z + 0 + 187 + 00 + 45328 = Z018700453282
- * - 187 = цифры с позиции 2 по 4 (после Z0) — номер магазина
- * - 45328 = последние 5 цифр
+ * - Z + 0 + NNN + 00 + XXXXX — 12 цифр после Z
+ * - NNN = цифры с позиции 2 по 4 (после Z0) — номер магазина
+ * - XXXXX = последние 5 цифр
  *
  * @throws {Error} профиль не настроен или код чужого магазина
  * @param {string} barcode - штрихкод со сканера
@@ -49,7 +49,7 @@ export function parseBarcodeToBrainNumber(barcode) {
   // Кириллическая «Я»
   cleaned = cleaned.replace(/^Я/, 'Z')
 
-  // Если уже в формате 187/45202 — проверяем магазин
+  // Если уже в формате NNN/XXXXX — проверяем магазин
   if (/^\d+\/\d+$/.test(cleaned)) {
     assertOwnStore(cleaned)
     return cleaned
@@ -77,7 +77,7 @@ export function parseBarcodeToBrainNumber(barcode) {
     }
 
     // Длины 10/11/13 однозначно не ложатся на формат NNN/NNNNN: прежние ветки
-    // возвращали мусор вида «870/5328» или «187/<13 цифр», guard «Неверный формат»
+    // возвращали мусор вида «870/5328» или «NNN/<13 цифр», guard «Неверный формат»
     // не срабатывал и в контейнер записывался фантомный товар с невалидным номером.
     // Лучше отклонить код, чем принять неверный номер.
     return null
@@ -89,7 +89,7 @@ export function parseBarcodeToBrainNumber(barcode) {
 /**
  * Проверяет соответствие штрихкода номеру в БД
  * @param {string} scannedBarcode - штрихкод со сканера
- * @param {string} dbNumber - номер из БД (например, "187/45328")
+ * @param {string} dbNumber - номер из БД (например, "NNN/XXXXX")
  * @returns {boolean}
  */
 export function isBarcodeMatch(scannedBarcode, dbNumber) {

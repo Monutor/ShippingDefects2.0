@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBrainStore } from '@/stores/brain'
+import { displayStoreNumber, isConfigured } from '@/lib/storeProfile'
 import { readExcelFile, getColumnHeaders } from '@/utils/excel'
 import { FileUpload } from '@/components/ui'
 
@@ -115,7 +116,18 @@ function autoMapColumns(headers) {
         <van-icon name="setting-o" size="22" aria-hidden="true" />
       </button>
       <div class="header-icon">📦</div>
-      <h1 class="header-title">Учёт брака</h1>
+      <h1 class="header-title">
+        Учёт брака
+        <span
+          class="store-chip text-xs font-semibold px-2 py-0.5 rounded-full"
+          :class="
+            isConfigured()
+              ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+              : 'bg-slate-700 text-slate-300 border border-slate-600'
+          "
+          >S{{ displayStoreNumber() }}</span
+        >
+      </h1>
       <p class="header-subtitle">Система складского учёта</p>
     </div>
 
