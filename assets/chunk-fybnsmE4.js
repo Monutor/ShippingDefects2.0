@@ -1,0 +1,1 @@
+import{t as e}from"./chunk-Bgk_szcY.js";export{e as useBoxesStore};
