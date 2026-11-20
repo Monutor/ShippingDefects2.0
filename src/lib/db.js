@@ -537,6 +537,22 @@ export const dbStore = {
       } catch (e) {
         return err(e?.message || 'counter failed')
       }
+    },
+    async get(key) {
+      try {
+        const row = await db.settings.get(key)
+        return ok(row ? row.value : null, null)
+      } catch (e) {
+        return err(e?.message || 'settings get failed')
+      }
+    },
+    async put(key, value) {
+      try {
+        await db.settings.put({ key, value })
+        return ok(null, null)
+      } catch (e) {
+        return err(e?.message || 'settings put failed')
+      }
     }
   },
 

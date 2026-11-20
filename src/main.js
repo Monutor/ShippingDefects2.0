@@ -98,6 +98,9 @@ app.use(router)
 try {
   const { ensureDbReady } = await import('@/lib/db')
   await ensureDbReady()
+  // Профиль магазина до навигации: роутер-гард должен видеть isConfigured()
+  const { loadStoreProfile } = await import('@/lib/storeProfile')
+  await loadStoreProfile()
 } catch (err) {
   console.error('[app] failed to prepare database:', err)
 }
