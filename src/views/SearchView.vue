@@ -54,7 +54,12 @@ function runSearch() {
   const q = query.value.trim()
   if (!q) return
   const qLower = q.toLowerCase()
-  const parsed = parseBarcodeToBrainNumber(q)
+  let parsed = null
+  try {
+    parsed = parseBarcodeToBrainNumber(q)
+  } catch {
+    // Чужой магазин или профиль не настроен — поиск только по тексту
+  }
 
   const exact = []
   const partial = []

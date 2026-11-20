@@ -65,8 +65,14 @@ function handleSelectCamera(deviceId) {
 async function submitTsd() {
   const input = props.scanner.tsdInput.value?.trim()
   if (!input) return
-  if (props.onTsdSubmit) await props.onTsdSubmit(input)
-  else emit('tsd-submit', input)
+  try {
+    if (props.onTsdSubmit) await props.onTsdSubmit(input)
+    else emit('tsd-submit', input)
+  } catch (err) {
+    // Магазин не настроен или код чужого магазина — парсер бросает Error
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100])
+    window.showToast(err.message || 'Ошибка обработки кода')
+  }
   showSuggestions.value = false
 }
 

@@ -133,7 +133,12 @@ export const useBrainStore = defineStore(
       if (!foundItem && barcode.trim()) {
         foundItem =
           items.value.find((item) => {
-            const normalizedArticle = parseBarcodeToBrainNumber(item.article) || item.article
+            let normalizedArticle = item.article
+            try {
+              normalizedArticle = parseBarcodeToBrainNumber(item.article) || item.article
+            } catch {
+              // Чужой ШК в article — сравниваем сырое значение
+            }
             return normalizedArticle && normalizedArticle === parsedBarcode
           }) || null
       }

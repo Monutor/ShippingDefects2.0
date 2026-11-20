@@ -64,7 +64,12 @@ const palletItemsWithDetails = computed(() => {
           data.name = found.name
           if (!data.article && found.article) data.article = found.article
         } else {
-          const parsedNum = parseBarcodeToBrainNumber(data.number)
+          let parsedNum = data.number
+          try {
+            parsedNum = parseBarcodeToBrainNumber(data.number)
+          } catch {
+            // Чужой магазин или профиль не настроен — оставляем как есть
+          }
           if (parsedNum !== data.number) {
             const found2 = brainStore.findByBarcode(parsedNum)
             if (found2 && found2.name) data.name = found2.name

@@ -98,6 +98,7 @@ export function useScanner(options = {}) {
           } catch (err) {
             // Сбрасываем lastBarcode, чтобы повторное сканирование сработало
             lastBarcode = ''
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100])
             window.showToast(err.message || 'Ошибка обработки скана')
           }
         },
@@ -159,7 +160,15 @@ export function useScanner(options = {}) {
     }
 
     const { parseBarcodeToBrainNumber, ensurePrefix } = await import('@/utils/barcode')
-    const barcode = ensurePrefix(parseBarcodeToBrainNumber(input))
+    let barcode
+    try {
+      barcode = ensurePrefix(parseBarcodeToBrainNumber(input))
+    } catch (err) {
+      // Магазин не настроен или код чужого магазина
+      if (navigator.vibrate) navigator.vibrate([100, 50, 100])
+      window.showToast(err.message || 'Ошибка обработки кода')
+      return false
+    }
 
     if (!barcode) {
       window.showToast(`Неверный формат: ${input}`)
