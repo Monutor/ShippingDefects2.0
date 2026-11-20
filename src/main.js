@@ -91,19 +91,20 @@ async function initializeApp() {
   window._appCleanup = {}
 }
 
-app.use(pinia)
-app.use(router)
-
-// Миграция IndexedDB на актуальную схему ДО любых чтений/записей
+// Миграция IndexedDB на актуальную схему ДО любых чтений/записей.
+// ВАЖНО: до app.use(router) — vue-router стартует первую навигацию
+// уже на install, и гард должен видеть загруженный профиль магазина.
 try {
   const { ensureDbReady } = await import('@/lib/db')
   await ensureDbReady()
-  // Профиль магазина до навигации: роутер-гард должен видеть isConfigured()
   const { loadStoreProfile } = await import('@/lib/storeProfile')
   await loadStoreProfile()
 } catch (err) {
   console.error('[app] failed to prepare database:', err)
 }
+
+app.use(pinia)
+app.use(router)
 
 // GitHub Pages SPA redirect handling
 const redirectPath = sessionStorage.getItem('redirect_path')

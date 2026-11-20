@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { isConfigured } from '@/lib/storeProfile'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -61,8 +62,19 @@ const router = createRouter({
       path: '/search',
       name: 'search',
       component: () => import('@/views/SearchView.vue')
+    },
+    {
+      path: '/store-setup',
+      name: 'store-setup',
+      component: () => import('@/views/StoreSetupView.vue')
     }
   ]
+})
+
+// Профиль магазина — gate всего приложения (загружен в main.js до навигации)
+router.beforeEach((to) => {
+  if (!isConfigured() && to.name !== 'store-setup') return { name: 'store-setup' }
+  if (isConfigured() && to.name === 'store-setup') return { name: 'home' }
 })
 
 export default router
